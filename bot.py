@@ -78,55 +78,6 @@ async def enable_cog(ctx, cog_name: str):
     else:
         await ctx.send(f"⚠️ `{cog_name}.py`는 이미 활성화 상태입니다.")
 
-@bot.command(name="리로드")
-@commands.is_owner()  # 봇 소유자만 실행 가능
-async def reload_cogs(ctx, cog_name: str = None):
-    """Cog를 강제로 리로드하는 명령어 (Python 캐싱 문제 해결)"""
-    if cog_name is None:
-        # 모든 Cogs 리로드
-        for filename in os.listdir("Cogs"):
-            if filename.endswith(".py") and filename != "__init__.py":
-                cog_path = f"Cogs.{filename[:-3]}"
-                try:
-                    await bot.unload_extension(cog_path)  # ✅ 기존 Cog 언로드
-                    importlib.reload(importlib.import_module(cog_path))  # ✅ 강제 리로드
-                    await bot.load_extension(cog_path)  # ✅ 다시 로드
-                    await ctx.send(f"🔄 `{filename}` 리로드 완료!")
-                except Exception as e:
-                    await ctx.send(f"❌ `{filename}` 리로드 실패: {e}")
-        return
-    
-    # 특정 Cog 리로드
-    cog_path = f"Cogs.{cog_name}"
-    try:
-        await bot.unload_extension(cog_path)  # ✅ 기존 Cog 언로드
-        importlib.reload(importlib.import_module(cog_path))  # ✅ 강제 리로드
-        await bot.load_extension(cog_path)  # ✅ 다시 로드
-        await ctx.send(f"🔄 `{cog_name}.py` 리로드 완료!")
-    except Exception as e:
-        await ctx.send(f"❌ `{cog_name}.py` 리로드 실패: {e}")
-
-@bot.command(name="로드")
-@commands.is_owner()  # 봇 소유자만 실행 가능
-async def load_new_cogs(ctx):
-    """
-    새로운 Cog 파일을 자동으로 불러오는 명령어
-    """
-    loaded_count = 0
-    for filename in os.listdir("Cogs"):
-        if filename.endswith(".py") and filename != "__init__.py":
-            cog_path = f"Cogs.{filename[:-3]}"
-            if cog_path not in bot.extensions:  # 새로운 파일만 로드
-                try:
-                    await bot.load_extension(cog_path)
-                    await ctx.send(f"✅ `{filename}` 추가 완료!")
-                    loaded_count += 1
-                except Exception as e:
-                    await ctx.send(f"❌ `{filename}` 추가 실패: {e}")
-    
-    if loaded_count == 0:
-        await ctx.send("⚠️ 새로운 파일이 없습니다!")
-
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')

@@ -3,3 +3,4 @@ python-dotenv
 asyncio
 yt_dlp
 pytz
+requests

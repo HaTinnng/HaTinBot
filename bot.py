@@ -45,26 +45,38 @@ async def load_extensions():
 @bot.command(name="비활성화")
 @commands.is_owner()
 async def disable_cog(ctx, cog_name: str):
-    """특정 Cog 파일을 비활성화"""
+    """특정 Cog 파일을 즉시 비활성화"""
     disabled_cogs = load_disabled_cogs()
 
     if cog_name not in disabled_cogs:
         disabled_cogs.append(cog_name)
         save_disabled_cogs(disabled_cogs)
-        await ctx.send(f"⏸️ `{cog_name}.py` 비활성화되었습니다. 봇을 재시작하면 적용됩니다.")
+
+        # 즉시 해당 Cog 언로드
+        try:
+            await bot.unload_extension(f"Cogs.{cog_name}")
+            await ctx.send(f"⏸️ `{cog_name}.py` 즉시 비활성화되었습니다.")
+        except Exception as e:
+            await ctx.send(f"⚠️ `{cog_name}.py` 비활성화 실패: {e}")
     else:
         await ctx.send(f"⚠️ `{cog_name}.py`는 이미 비활성화 상태입니다.")
 
 @bot.command(name="활성화")
 @commands.is_owner()
 async def enable_cog(ctx, cog_name: str):
-    """특정 Cog 파일을 활성화"""
+    """특정 Cog 파일을 즉시 활성화"""
     disabled_cogs = load_disabled_cogs()
 
     if cog_name in disabled_cogs:
         disabled_cogs.remove(cog_name)
         save_disabled_cogs(disabled_cogs)
-        await ctx.send(f"✅ `{cog_name}.py` 활성화되었습니다. 봇을 재시작하면 적용됩니다.")
+
+        # 즉시 해당 Cog 로드
+        try:
+            await bot.load_extension(f"Cogs.{cog_name}")
+            await ctx.send(f"✅ `{cog_name}.py` 즉시 활성화되었습니다.")
+        except Exception as e:
+            await ctx.send(f"⚠️ `{cog_name}.py` 활성화 실패: {e}")
     else:
         await ctx.send(f"⚠️ `{cog_name}.py`는 이미 활성화 상태입니다.")
 
@@ -116,6 +128,7 @@ async def load_new_cogs(ctx):
     
     if loaded_count == 0:
         await ctx.send("⚠️ 새로운 파일이 없습니다!") 
+
 
 @bot.event
 async def on_ready():

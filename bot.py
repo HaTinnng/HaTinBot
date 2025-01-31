@@ -78,10 +78,13 @@ async def on_ready():
 
 async def main():
     await load_extensions()
-    with open("discord_token.txt", "r") as file:
-        bot_token = file.readline().strip()
+    bot_token = os.getenv("DISCORD_TOKEN")  # ✅ 환경변수에서 토큰 가져오기
+    if not bot_token:
+        print("❌ [오류] 환경변수 DISCORD_TOKEN이 설정되지 않았습니다.")
+        return
     await bot.start(bot_token)
 
 # 봇 실행
 if __name__ == "__main__":
-    asyncio.run(main())  # main() 함수로 비동기 로드 처리
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())  # ✅ 클라우드타입 환경에서 실행 가능하도록 변경

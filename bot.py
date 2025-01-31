@@ -130,7 +130,7 @@ async def load_new_cogs(ctx):
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    game = discord.Game("폭탄게임 하는중!")
+    game = discord.Game("폭탄게임")
     await bot.change_presence(status=discord.Status.online, activity=game)
 
 @bot.event

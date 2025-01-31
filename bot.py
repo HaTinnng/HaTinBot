@@ -81,15 +81,15 @@ async def enable_cog(ctx, cog_name: str):
 @bot.command(name="리로드")
 @commands.is_owner()  # 봇 소유자만 실행 가능
 async def reload_cogs(ctx, cog_name: str = None):
-    """Cog를 강제로 리로드하는 명령어 (Python 캐싱 문제 해결)"""
+    """Cog를 강제로 리로드하는 명령어 (중복 로드 방지)"""
     if cog_name is None:
         # 모든 Cogs 리로드
         for filename in os.listdir("Cogs"):
             if filename.endswith(".py") and filename != "__init__.py":
                 cog_path = f"Cogs.{filename[:-3]}"
                 try:
-                    await bot.unload_extension(cog_path)  # ✅ 기존 Cog 언로드
-                    importlib.reload(importlib.import_module(cog_path))  # ✅ 강제 리로드
+                    if cog_path in bot.extensions:  # ✅ 이미 로드된 경우만 언로드 후 로드
+                        await bot.unload_extension(cog_path)
                     await bot.load_extension(cog_path)  # ✅ 다시 로드
                     await ctx.send(f"🔄 `{filename}` 리로드 완료!")
                 except Exception as e:
@@ -99,8 +99,8 @@ async def reload_cogs(ctx, cog_name: str = None):
     # 특정 Cog 리로드
     cog_path = f"Cogs.{cog_name}"
     try:
-        await bot.unload_extension(cog_path)  # ✅ 기존 Cog 언로드
-        importlib.reload(importlib.import_module(cog_path))  # ✅ 강제 리로드
+        if cog_path in bot.extensions:  # ✅ 이미 로드된 경우만 언로드 후 로드
+            await bot.unload_extension(cog_path)
         await bot.load_extension(cog_path)  # ✅ 다시 로드
         await ctx.send(f"🔄 `{cog_name}.py` 리로드 완료!")
     except Exception as e:
@@ -110,13 +110,13 @@ async def reload_cogs(ctx, cog_name: str = None):
 @commands.is_owner()  # 봇 소유자만 실행 가능
 async def load_new_cogs(ctx):
     """
-    새로운 Cog 파일을 자동으로 불러오는 명령어
+    새로운 Cog 파일을 자동으로 불러오는 명령어 (중복 로드 방지)
     """
     loaded_count = 0
     for filename in os.listdir("Cogs"):
         if filename.endswith(".py") and filename != "__init__.py":
             cog_path = f"Cogs.{filename[:-3]}"
-            if cog_path not in bot.extensions:  # 새로운 파일만 로드
+            if cog_path not in bot.extensions:  # ✅ 새로운 파일만 로드
                 try:
                     await bot.load_extension(cog_path)
                     await ctx.send(f"✅ `{filename}` 추가 완료!")

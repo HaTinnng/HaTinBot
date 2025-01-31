@@ -28,7 +28,6 @@ class Food(commands.Cog):
             "감자탕", "삼합", "코다리찜", "비빔국수", "청국장",
             "🌟 굶기 (오늘은 아무것도 먹지 말자...) 🌟"
         ]
-        print("✅ Food Cog 초기화됨!")  # Cog 로드 확인
 
     @commands.command(name="오늘의음식", aliases=["추천음식", "랜덤음식"])
     async def today_food(self, ctx):
@@ -36,6 +35,7 @@ class Food(commands.Cog):
         selected_food = random.choice(self.food_list)
         await ctx.send(f"🍽️ 오늘의 추천 음식: **{selected_food}**")
 
-def setup(bot):
-    print("✅ setup() 실행됨! Food Cog 추가 완료")  # setup 함수 실행 확인
-    bot.add_cog(Food(bot))
+async def setup(bot):
+    """ 중복 로드를 방지하고 Cog를 추가하는 안전한 함수 """
+    if not bot.get_cog("Food"):  # 중복 방지 (이미 로드된 경우 추가 X)
+        await bot.add_cog(Food(bot))

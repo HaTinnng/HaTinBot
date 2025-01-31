@@ -1,11 +1,14 @@
 import discord
-import random
 from discord.ext import commands
+import random
 
 class Food(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.food_list = [
+
+    @commands.command(name="오늘의음식", aliases=["추천음식", "랜덤음식"], help="오늘의 운세를 알려드립니다.")
+    async def food(self, ctx):
+        food = [
             "김치찌개", "된장찌개", "순두부찌개", "부대찌개", "해물탕",
             "갈비탕", "설렁탕", "떡국", "육개장", "삼계탕",
             "짜장면", "짬뽕", "볶음밥", "탕수육", "깐풍기",
@@ -29,13 +32,11 @@ class Food(commands.Cog):
             "🌟 굶기 (오늘은 아무것도 먹지 말자...) 🌟"
         ]
 
-    @commands.command(name="오늘의음식", aliases=["추천음식", "랜덤음식"])
-    async def today_food(self, ctx):
-        """ 랜덤으로 음식 하나를 추천하는 명령어 """
-        selected_food = random.choice(self.food_list)
-        await ctx.send(f"🍽️ 오늘의 추천 음식: **{selected_food}**")
+        # 랜덤으로 운세 문구를 선택합니다.
+        food = random.choice(food)
+
+        # 선택된 운세를 출력합니다.
+        await ctx.send(f"오늘 먹을 것은: {food}! 꼭 드세요!")
 
 async def setup(bot):
-    """ 중복 로드를 방지하고 Cog를 추가하는 안전한 함수 """
-    if not bot.get_cog("Food"):  # 중복 방지 (이미 로드된 경우 추가 X)
-        await bot.add_cog(Food(bot))
+    await bot.add_cog(Food(bot))

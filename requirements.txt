@@ -6,3 +6,4 @@ pytz
 requests
 discord
 PyNaCl
+ffmpeg

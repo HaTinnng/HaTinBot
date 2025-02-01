@@ -5,3 +5,4 @@ yt_dlp
 pytz
 requests
 discord
+PyNaCl

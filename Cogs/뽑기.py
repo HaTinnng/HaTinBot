@@ -58,6 +58,7 @@ class Draw(commands.Cog):
 
         # 5초 딜레이
         await asyncio.sleep(5)
+        
 
         rand_value = random.random()  # 0과 1 사이의 랜덤 값
 

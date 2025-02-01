@@ -54,11 +54,13 @@ class Draw(commands.Cog):
             return
 
         # 뽑는 중 메시지 출력
-        await ctx.send("🎰 **물건을 뽑는 중입니다... 잠시만 기다려 주세요!**")
+        loading_message = await ctx.send("🎰 **물건을 뽑는 중입니다... 잠시만 기다려 주세요!**")
 
         # 5초 딜레이
         await asyncio.sleep(5)
-        
+
+        # 기존 메시지 삭제
+        await loading_message.delete()
 
         rand_value = random.random()  # 0과 1 사이의 랜덤 값
 

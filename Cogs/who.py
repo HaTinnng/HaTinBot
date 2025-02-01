@@ -5,7 +5,7 @@ class Who(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="누구야", help="하틴봇이 누구인지 알려드립니다!")
+    @commands.command(name="누구야", aliases=["하틴봇"], help="하틴봇이 누구인지 알려드립니다!")
     async def who_is_hatinbot(self, ctx):
         """하틴봇에 대한 정보를 출력하는 명령어"""
 
@@ -16,7 +16,7 @@ class Who(commands.Cog):
             color=0x5865F2  # Discord 블루 컬러
         )
 
-        embed.set_thumbnail(url="https://your-image-url.com/logo.png")  # ✅ 하틴봇 로고 URL 수정 필요
+        embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1335268420379349044/1335268570690752604/790_20210928170325.png?ex=679f8d43&is=679e3bc3&hm=55c0fa9f3fbc5dee18906dee54fdcf8ea4e67570e4656c7730af1ee5a6bc88fa&")  # ✅ 하틴봇 로고 URL 수정 필요
         embed.add_field(name="✨ 주요 기능", value="""
         - 🎮 **미니 게임** (가위바위보, 랜덤 추천 등)
         - 🛠️ **유틸리티 명령어** (운세, 음식 추천 등)

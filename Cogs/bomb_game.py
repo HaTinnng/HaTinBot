@@ -11,6 +11,36 @@ class BombGame(discord.ui.View):
         self.current_turn = 0  # 현재 턴 (순서)
         self.bomb_position = random.randint(1, num_buttons)  # 랜덤 폭탄 위치
         self.create_buttons()
+        self.timeout_task = self.ctx.bot.loop.create_task(self.start_timeout_timer())
+
+    async def start_timeout_timer(self):
+        await asyncio.sleep(30)
+        if self.ctx and self.players:
+            loser = self.players[self.current_turn]
+            await self.ctx.send(f"⏳ {loser.mention}님이 30초 동안 버튼을 누르지 않아 패배했습니다! 게임 종료! 💥")
+            self.stop()
+
+    def reset_timeout_timer(self):
+        if self.timeout_task:
+            self.timeout_task.cancel()
+        self.timeout_task = self.ctx.bot.loop.create_task(self.start_timeout_timer())
+    def __init__(self, ctx, num_buttons, players):
+        super().__init__()
+        self.ctx = ctx
+        self.num_buttons = num_buttons
+        self.players = players
+        self.current_turn = 0  # 현재 턴 (순서)
+        self.bomb_position = random.randint(1, num_buttons)  # 랜덤 폭탄 위치
+        self.create_buttons()
+        self.timeout_task = self.ctx.bot.loop.create_task(self.start_timeout_timer())
+    def __init__(self, ctx, num_buttons, players):
+        super().__init__()
+        self.ctx = ctx
+        self.num_buttons = num_buttons
+        self.players = players
+        self.current_turn = 0  # 현재 턴 (순서)
+        self.bomb_position = random.randint(1, num_buttons)  # 랜덤 폭탄 위치
+        self.create_buttons()
 
     def create_buttons(self):
         """동적으로 n개의 버튼을 생성"""
@@ -20,6 +50,7 @@ class BombGame(discord.ui.View):
             self.add_item(button)
 
     def make_callback(self, position: int):
+        self.reset_timeout_timer()
         """각 버튼에 개별 이벤트 추가"""
         async def callback(interaction: discord.Interaction):
             if interaction.user != self.players[self.current_turn]:  # 본인 차례인지 확인
@@ -45,12 +76,47 @@ class BombGame(discord.ui.View):
         return callback
 
     async def update_turn_message(self, message):
+        self.reset_timeout_timer()
+        current_player = self.players[self.current_turn]
+        new_content = f"💣 **폭탄 게임 시작!**
+현재 차례: {current_player.mention}
+순서대로 버튼을 눌러주세요!"
+        await message.edit(content=new_content)
+        self.reset_timeout_timer()
         """현재 차례인 플레이어를 메시지에 표시"""
         current_player = self.players[self.current_turn]
         new_content = f"💣 **폭탄 게임 시작!**\n현재 차례: {current_player.mention}\n순서대로 버튼을 눌러주세요!"
         await message.edit(content=new_content)
 
 class BombGameLobby(discord.ui.View):
+    def __init__(self, ctx, num_buttons):
+        super().__init__()
+        self.ctx = ctx
+        self.num_buttons = num_buttons
+        self.players = [ctx.author]  # 방장은 자동 참가
+        self.timeout_task = self.ctx.bot.loop.create_task(self.start_timeout_timer())
+
+    async def start_timeout_timer(self):
+        await asyncio.sleep(120)  # 2분 대기
+        if self.ctx and self.players:
+            await self.ctx.send("⏳ 2분 동안 게임이 시작되지 않아 방이 자동 삭제되었습니다! 🛑")
+            self.stop()
+
+    def reset_timeout_timer(self):
+        if self.timeout_task:
+            self.timeout_task.cancel()
+        self.timeout_task = self.ctx.bot.loop.create_task(self.start_timeout_timer())
+    def __init__(self, ctx, num_buttons):
+        super().__init__()
+        self.ctx = ctx
+        self.num_buttons = num_buttons
+        self.players = [ctx.author]  # 방장은 자동 참가
+        self.timeout_task = self.ctx.bot.loop.create_task(self.start_timeout_timer())
+    def __init__(self, ctx, num_buttons):
+        super().__init__()
+        self.ctx = ctx
+        self.num_buttons = num_buttons
+        self.players = [ctx.author]  # 방장은 자동 참가
     def __init__(self, ctx, num_buttons):
         super().__init__()
         self.ctx = ctx
@@ -71,7 +137,18 @@ class BombGameLobby(discord.ui.View):
         self.quit_button.callback = self.quit_game  # 버튼 클릭 시 실행될 함수 설정
         self.add_item(self.quit_button)
 
+        # ✅ 참가하기 버튼 추가
+        self.join_button = discord.ui.Button(label="참가하기", style=discord.ButtonStyle.success)
+        self.join_button.callback = self.join_game  # 버튼 클릭 시 실행될 함수 설정
+        self.add_item(self.join_button)
+
+        # ✅ 시작하기 버튼 추가 (방장만 가능)
+        self.start_button = discord.ui.Button(label="시작하기", style=discord.ButtonStyle.primary)
+        self.start_button.callback = self.start_game  # 버튼 클릭 시 실행될 함수 설정
+        self.add_item(self.start_button)
+
     async def update_participants(self, message):
+        self.reset_timeout_timer()
         """참여 인원 버튼 업데이트 (이름 없이 숫자만 표시)"""
         self.participants_button.label = f"참여 인원: {len(self.players)}명 | 방장: {self.ctx.author.name}"
         await message.edit(view=self)
@@ -80,6 +157,31 @@ class BombGameLobby(discord.ui.View):
         """전체 인원 보기 버튼 클릭 시"""
         participants_list = "\n".join([f"- {p.name}" for p in self.players])
         await interaction.response.send_message(f"🎮 **현재 참여 인원:**\n{participants_list}", ephemeral=True)
+
+    async def join_game(self, interaction: discord.Interaction):
+        """참가하기 버튼 클릭 시"""
+        if interaction.user in self.players:
+            await interaction.response.send_message("✅ 이미 게임에 참가했습니다!", ephemeral=True)
+        else:
+            self.players.append(interaction.user)
+            await interaction.response.send_message(f"🎮 {interaction.user.mention}님이 게임에 참여했습니다!", ephemeral=False)
+            await self.update_participants(interaction.message)
+
+    async def start_game(self, interaction: discord.Interaction):
+        self.timeout_task.cancel()
+        """방장만 게임 시작 가능"""
+        if interaction.user != self.ctx.author:
+            await interaction.response.send_message("🚫 방장만 게임을 시작할 수 있습니다!", ephemeral=True)
+            return
+
+        if len(self.players) < 1:
+            await interaction.response.send_message("⚠️ 최소 1명이 필요합니다!", ephemeral=True)
+            return
+
+        await interaction.response.send_message("🎲 게임이 시작됩니다!", ephemeral=False)
+        view = BombGame(ctx=self.ctx, num_buttons=self.num_buttons, players=self.players)
+        message = await interaction.message.edit(content="💣 **폭탄 게임 시작!** /n순서대로 버튼을 눌러주세요!", view=view)
+        await view.update_turn_message(message)
 
     async def quit_game(self, interaction: discord.Interaction):
         """그만두기 버튼 클릭 시"""

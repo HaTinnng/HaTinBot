@@ -1,16 +1,16 @@
 import discord
 from discord.ext import commands
 
-class HatinBot(commands.Cog):
+class Who(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="하틴봇", help="하틴봇에 대한 정보를 제공합니다!")
-    async def hatinbot_info(self, ctx):
+    @commands.command(name="누구야", help="하틴봇이 누구인지 알려드립니다!")
+    async def who_is_hatinbot(self, ctx):
         """하틴봇에 대한 정보를 출력하는 명령어"""
 
         embed = discord.Embed(
-            title="🤖 하틴봇 정보",
+            title="🤖 하틴봇은 누구인가?",
             description="하틴봇은 다양한 기능을 제공하는 다목적 디스코드 봇입니다!\n"
                         "채팅, 게임, 유틸리티, 관리 기능까지 모두 포함되어 있습니다.",
             color=0x5865F2  # Discord 블루 컬러
@@ -27,7 +27,7 @@ class HatinBot(commands.Cog):
         embed.add_field(name="📜 주요 명령어", value="""
         - `#가위바위보` → 하틴봇과 가위바위보를 할 수 있습니다.
         - `#오늘의음식` → 랜덤으로 음식 추천을 받습니다.
-        - `#하틴봇` → 하틴봇에 대한 정보를 확인할 수 있습니다.
+        - `#누구야` → 하틴봇에 대한 정보를 확인할 수 있습니다.
         """, inline=False)
 
         embed.set_footer(text="하틴봇과 함께 즐거운 디스코드 생활을!")
@@ -35,5 +35,5 @@ class HatinBot(commands.Cog):
         await ctx.send(embed=embed)
 
 async def setup(bot):
-    """봇에 Cog 추가 (정상적으로 로드되도록 일관성 유지)"""
-    await bot.add_cog(HatinBot(bot))
+    """봇에 Cog 추가 (정상적으로 로드되도록 설정)"""
+    await bot.add_cog(Who(bot))

@@ -42,7 +42,7 @@ class Draw(commands.Cog):
         ]
         self.items = [(item, probability / 100) for item, probability in self.items]  # 확률을 0과 1 사이로 변환
 
-    @commands.command(name="뽑기")
+    @commands.command(name="뽑기", aliases=["가챠"])
     async def draw(self, ctx, num: str = None):
         """
         #뽑기 명령어로 한 번만 상품을 뽑을 수 있습니다.

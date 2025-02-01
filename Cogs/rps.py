@@ -3,11 +3,12 @@ from discord.ext import commands
 import random
 
 class RPSView(discord.ui.View):
-    def __init__(self, player):
+    def __init__(self, player, message):
         """플레이어를 저장하여 해당 사용자만 게임 진행 가능하도록 설정"""
         super().__init__()
         self.choices = ["가위", "바위", "보"]
         self.player = player  # 명령어를 입력한 사용자 저장
+        self.message = message  # 메시지를 삭제하기 위해 저장
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """명령어 입력자만 버튼을 클릭할 수 있도록 제한"""
@@ -37,29 +38,23 @@ class RPSView(discord.ui.View):
             # 비긴 경우, 다시 진행 (새로운 버튼 제공)
             await interaction.response.edit_message(
                 content=f"🤝 비등하네... 다시 한 번!\n가위...바위...보!",
-                view=RPSView(self.player)  # 새로운 View 생성 (게임 지속)
-            )
-        elif (player_choice == "가위" and bot_choice == "보") or \
-             (player_choice == "바위" and bot_choice == "가위") or \
-             (player_choice == "보" and bot_choice == "바위"):
-            # 플레이어 승리 (버튼 비활성화 후 게임 종료)
-            self.disable_all_buttons()
-            await interaction.response.edit_message(
-                content=f"🎉 축하합니다! 하틴봇을 이겼습니다!\n\n🧑 {player_choice} vs 🤖 {bot_choice}",
-                view=self
+                view=RPSView(self.player, self.message)  # 새로운 View 생성 (게임 지속)
             )
         else:
-            # 플레이어 패배 (버튼 비활성화 후 게임 종료)
-            self.disable_all_buttons()
-            await interaction.response.edit_message(
-                content=f"😢 하틴봇을 이기지 못했습니다.\n\n🧑 {player_choice} vs 🤖 {bot_choice}",
-                view=self
-            )
+            # 버튼이 포함된 메시지를 삭제하고 결과 메시지를 출력
+            await self.message.delete()
 
-    def disable_all_buttons(self):
-        """버튼을 비활성화하여 게임이 끝난 후 다시 선택할 수 없도록 함"""
-        for child in self.children:
-            child.disabled = True
+            if (player_choice == "가위" and bot_choice == "보") or \
+               (player_choice == "바위" and bot_choice == "가위") or \
+               (player_choice == "보" and bot_choice == "바위"):
+                # 플레이어 승리
+                result_message = f"🎉 축하합니다! 하틴봇을 이겼습니다!\n\n🧑 {player_choice} vs 🤖 {bot_choice}"
+            else:
+                # 플레이어 패배
+                result_message = f"😢 하틴봇을 이기지 못했습니다.\n\n🧑 {player_choice} vs 🤖 {bot_choice}"
+
+            # 게임 결과를 새로운 메시지로 출력
+            await interaction.channel.send(result_message)
 
 class RPS(commands.Cog):
     def __init__(self, bot):
@@ -68,10 +63,14 @@ class RPS(commands.Cog):
     @commands.command(name="가위바위보", help="하틴봇과 가위바위보 게임을 합니다!")
     async def play_rps(self, ctx):
         """가위바위보 게임을 시작하는 명령어"""
-        await ctx.send(
+        message = await ctx.send(
             "🎮 **하틴봇과 가위바위보를 시작합니다!**\n가위...바위...보!",
-            view=RPSView(ctx.author)  # 명령어 입력자를 저장
+            view=RPSView(ctx.author, None)  # 메시지를 아직 저장하지 않음
         )
+        # 메시지를 저장하여 이후 삭제할 수 있도록 설정
+        view = RPSView(ctx.author, message)
+        view.message = message
+        await message.edit(view=view)
 
 async def setup(bot):
     await bot.add_cog(RPS(bot))

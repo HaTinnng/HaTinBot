@@ -108,7 +108,7 @@ class BombGameLobby(discord.ui.View):
         message = await interaction.message.edit(content="💣 **폭탄 게임 시작!**\n순서대로 버튼을 눌러주세요!", view=view)
         await view.update_turn_message(message)  # 게임 메시지에 현재 차례 표시
 
-       async def quit_game(self, interaction: discord.Interaction):
+    async def quit_game(self, interaction: discord.Interaction):
         """그만두기 버튼 클릭 시 (방장: 방 삭제, 참가자: 게임 나가기)"""
         if interaction.user == self.ctx.author:
             # 방장이 나가면 방 삭제 (게임 종료)

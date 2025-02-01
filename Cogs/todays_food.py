@@ -7,7 +7,7 @@ class Food(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="오늘의음식", help="200가지 이상의 음식 중 랜덤으로 추천해드립니다!")
+    @commands.command(name="오늘의음식", aliases=["오음", "추천음식", "추천메뉴"], help="200가지 이상의 음식 중 랜덤으로 추천해드립니다!")
     async def todays_food(self, ctx):
         """200가지가 넘는 음식 중 랜덤 추천 (1개는 '오늘은 굶기')"""
 

@@ -78,9 +78,7 @@ class BombGame(discord.ui.View):
     async def update_turn_message(self, message):
         self.reset_timeout_timer()
         current_player = self.players[self.current_turn]
-        new_content = f"💣 **폭탄 게임 시작!**
-현재 차례: {current_player.mention}
-순서대로 버튼을 눌러주세요!"
+        new_content = f"💣 **폭탄 게임 시작!**\n현재 차례: {current_player.mention}\n순서대로 버튼을 눌러주세요!"
         await message.edit(content=new_content)
         self.reset_timeout_timer()
         """현재 차례인 플레이어를 메시지에 표시"""
@@ -180,7 +178,7 @@ class BombGameLobby(discord.ui.View):
 
         await interaction.response.send_message("🎲 게임이 시작됩니다!", ephemeral=False)
         view = BombGame(ctx=self.ctx, num_buttons=self.num_buttons, players=self.players)
-        message = await interaction.message.edit(content="💣 **폭탄 게임 시작!** /n순서대로 버튼을 눌러주세요!", view=view)
+        message = await interaction.message.edit(content="💣 **폭탄 게임 시작!** \n순서대로 버튼을 눌러주세요!", view=view)
         await view.update_turn_message(message)
 
     async def quit_game(self, interaction: discord.Interaction):

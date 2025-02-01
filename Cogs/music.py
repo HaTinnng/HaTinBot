@@ -146,10 +146,12 @@ class Music(commands.Cog):
             return
 
         await self.song_queue.put(url)
-        if not self.is_playing:
+        await ctx.send(f"✅ 플레이리스트에 추가되었습니다: {url}")
+
+        # ✅ 자동 재생 기능 추가
+        if not self.is_playing:  # 현재 재생 중이 아니면 즉시 재생
             await self.play_next(ctx)
-        else:
-            await ctx.send(f"✅ 플레이리스트에 추가되었습니다: {url}")
+
 
     @commands.command(name="스킵", aliases=["넘겨"])
     async def skip(self, ctx):

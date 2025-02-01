@@ -56,8 +56,8 @@ class Draw(commands.Cog):
         # 뽑는 중 메시지 출력
         loading_message = await ctx.send("🎰 **물건을 뽑는 중입니다... 잠시만 기다려 주세요!**")
 
-        # 5초 딜레이
-        await asyncio.sleep(5)
+        # 3.5초 딜레이
+        await asyncio.sleep(3.5)
 
         # 기존 메시지 삭제
         await loading_message.delete()

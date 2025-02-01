@@ -59,6 +59,9 @@ class Draw(commands.Cog):
         # 5초 딜레이
         await asyncio.sleep(5)
 
+        # 기존 메세지 자동 삭제
+        await loading_message.delete()
+
         rand_value = random.random()  # 0과 1 사이의 랜덤 값
 
         selected_item = "빈 병"  # 기본값은 빈 병

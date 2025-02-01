@@ -16,7 +16,7 @@ class HatinBot(commands.Cog):
             color=0x5865F2  # Discord 블루 컬러
         )
 
-        embed.set_thumbnail(url="https://your-image-url.com/logo.png")  # 하틴봇 이미지 (수정 가능)
+        embed.set_thumbnail(url="https://your-image-url.com/logo.png")  # ✅ 하틴봇 로고 URL 수정 필요
         embed.add_field(name="✨ 주요 기능", value="""
         - 🎮 **미니 게임** (가위바위보, 랜덤 추천 등)
         - 🛠️ **유틸리티 명령어** (운세, 음식 추천 등)
@@ -35,4 +35,5 @@ class HatinBot(commands.Cog):
         await ctx.send(embed=embed)
 
 async def setup(bot):
+    """봇에 Cog 추가 (정상적으로 로드되도록 일관성 유지)"""
     await bot.add_cog(HatinBot(bot))

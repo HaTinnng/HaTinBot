@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import random
+import asyncio
 
 class UselessPowers(commands.Cog):
     def __init__(self, bot):
@@ -69,34 +70,14 @@ class UselessPowers(commands.Cog):
             "창문 닫을 때 소리를 줄이기",
             "물통 뚜껑을 적절한 힘으로 닫기",
             "숟가락으로 국물 덜 흘리기",
-            "양손으로 비닐봉지 더 쉽게 열기",
-            "손톱깎이로 소리 없이 손톱 자르기",
-            "책상 위에서 펜이 굴러가지 않게 하기",
-            "양말을 더 쉽게 뒤집기",
-            "스마트폰 화면을 덜 지문 묻히고 터치하기",
-            "수저통에서 젓가락 한 번에 뽑기",
-            "핸드폰을 한 손으로 더 쉽게 사용하기",
-            "의자에서 덜 삐걱거리게 앉기",
-            "마스크를 귀가 덜 아프게 착용하기",
-            "얼굴을 덜 가렵게 긁기",
-            "한손으로 양말 정리하기",
-            "비닐봉지 묶는 속도 증가",
-            "연필을 깔끔하게 깎기",
-            "버튼을 적절한 힘으로 누르기",
-            "이불을 한 번에 깔끔하게 개기",
-            "노래방에서 마이크 볼륨을 정확히 맞추기",
-            "음식 배달 예상 도착 시간을 잘 맞추기",
-            "택배 상자를 더 깔끔하게 개봉하기",
-            "새로 산 신발을 발에 적응시키는 속도 증가",
-            "테이블 위의 물건들을 안정적으로 배치하기",
-            "책을 읽을 때 줄을 덜 놓치기",
-            "알람을 더 효과적으로 맞추기",
-            "목소리를 더 부드럽게 내기",
-            "양말을 신을 때 발을 더 정확하게 넣기"
+            "양손으로 비닐봉지 더 쉽게 열기"
         ]
     
     @commands.command(name="초능력")
     async def useless_power(self, ctx):
+        message = await ctx.send("🔮 당신의 숨겨진 초능력을 찾고 있습니다...")
+        await asyncio.sleep(2)
+        await message.delete()
         power = random.choice(self.powers)
         await ctx.send(f"🌀 당신의 초능력: **{power}**")
 

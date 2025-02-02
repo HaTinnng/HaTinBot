@@ -93,7 +93,7 @@ class UselessPowers(commands.Cog):
     @commands.command(name="초능력")
     async def useless_power(self, ctx):
         message = await ctx.send("🔮 당신의 숨겨진 초능력을 찾고 있습니다...")
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
         await message.delete()
         power = random.choice(self.powers)
         await ctx.send(f"🌀 당신의 초능력: **{power}**")

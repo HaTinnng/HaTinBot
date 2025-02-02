@@ -43,8 +43,10 @@ class Draw(commands.Cog):
         ]
         self.first_place_file = "first_place_records.txt"  # 1등 기록 저장 파일
         self.second_place_file = "second_place_records.txt"  # 2등 기록 저장 파일
+        self.third_place_file = "third_place_records.txt"  # 동전 기록 저장 파일
         self.load_first_place_records()  # 서버 시작 시 기록 불러오기
         self.load_second_place_records()
+        self.load_third_place_records()
 
     def load_first_place_records(self):
         try:
@@ -59,6 +61,13 @@ class Draw(commands.Cog):
                 self.second_place_records = f.read().splitlines()
         except FileNotFoundError:
             self.second_place_records = []
+    
+    def load_third_place_records(self):
+        try:
+            with open(self.third_place_file, "r", encoding="utf-8") as f:
+                self.third_place_records = f.read().splitlines()
+        except FileNotFoundError:
+            self.third_place_records = []
 
     def save_first_place_record(self, record):
         with open(self.first_place_file, "a", encoding="utf-8") as f:
@@ -66,6 +75,10 @@ class Draw(commands.Cog):
     
     def save_second_place_record(self, record):
         with open(self.second_place_file, "a", encoding="utf-8") as f:
+            f.write(record + "\n")
+    
+    def save_third_place_record(self, record):
+        with open(self.third_place_file, "a", encoding="utf-8") as f:
             f.write(record + "\n")
 
     @commands.command(name="뽑기", aliases=["가챠"])
@@ -88,16 +101,19 @@ class Draw(commands.Cog):
                 selected_item = item
                 break
 
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if selected_item == "전설적인 용의 검":
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             record = f"{now} - {ctx.author.name}님이 전설적인 용의 검을 뽑았습니다!"
             self.first_place_records.append(record)
-            self.save_first_place_record(record)  # 파일에 저장
+            self.save_first_place_record(record)
         elif selected_item == "황금 재규어":
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             record = f"{now} - {ctx.author.name}님이 황금 재규어를 뽑았습니다!"
             self.second_place_records.append(record)
-            self.save_second_place_record(record)  # 파일에 저장
+            self.save_second_place_record(record)
+        elif selected_item == "동전":
+            record = f"{now} - {ctx.author.name}님이 동전을 뽑았습니다!"
+            self.third_place_records.append(record)
+            self.save_third_place_record(record)
 
         embed = discord.Embed(
             title="**상품을 뽑았습니다!**",
@@ -111,21 +127,13 @@ class Draw(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="뽑기1등")
-    async def first_place(self, ctx):
-        if not self.first_place_records:
-            await ctx.send("❌ 아직 1등 기록이 없습니다!")
+    @commands.command(name="뽑기3등")
+    async def third_place(self, ctx):
+        if not self.third_place_records:
+            await ctx.send("❌ 아직 동전 기록이 없습니다!")
         else:
-            records = "\n".join(self.first_place_records[-10:])  # 최근 10개까지만 표시
-            await ctx.send(f"🏆 **최근 1등 기록:**\n{records}")
-    
-    @commands.command(name="뽑기2등")
-    async def second_place(self, ctx):
-        if not self.second_place_records:
-            await ctx.send("❌ 아직 2등 기록이 없습니다!")
-        else:
-            records = "\n".join(self.second_place_records[-10:])  # 최근 10개까지만 표시
-            await ctx.send(f"🥈 **최근 2등 기록:**\n{records}")
+            records = "\n".join(self.third_place_records[-10:])
+            await ctx.send(f"🥉 **최근 동전 기록:**\n{records}")
 
 async def setup(bot):
     await bot.add_cog(Draw(bot))

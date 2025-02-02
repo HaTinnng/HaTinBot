@@ -20,7 +20,7 @@ class UpDownGame(commands.Cog):
             return
 
         secret_number = random.randint(1, max_number)
-        self.games[ctx.author.id] = {"number": secret_number, "attempts": 0}
+        self.games[ctx.author.id] = {"number": secret_number, "attempts": 0, "guesses": []}
         await ctx.send(f"🎮 {ctx.author.mention}, 1부터 {max_number} 사이의 숫자를 맞혀보세요! (게임을 종료하려면 #업다운그만 입력)")
 
     @commands.command(name="업다운그만")
@@ -33,6 +33,16 @@ class UpDownGame(commands.Cog):
         del self.games[ctx.author.id]
         await ctx.send(f"⛔ 게임이 종료되었습니다. 하틴봇이 선정한 숫자는 **{secret_number}**였습니다!")
 
+    @commands.command(name="업다운종합")
+    async def updown_summary(self, ctx):
+        if ctx.author.id not in self.games:
+            await ctx.send("🚨 당신은 현재 업다운 게임을 진행 중이 아닙니다!")
+            return
+        
+        game = self.games[ctx.author.id]
+        guesses = ", ".join(map(str, game["guesses"])) if game["guesses"] else "없음"
+        await ctx.send(f"📊 **업다운 게임 종합 정보**\n🧐 시도한 숫자들: {guesses}\n🎯 총 시도 횟수: {game['attempts']}번")
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
@@ -44,11 +54,12 @@ class UpDownGame(commands.Cog):
             if message.content.isdigit():
                 guess = int(message.content)
                 game["attempts"] += 1
+                game["guesses"].append(guess)
                 
                 if guess < game["number"]:
-                    await message.channel.send(f"🔺 **업!**\n하틴봇의 숫자가 더 크네요!")
+                    await message.channel.send(f"🔺 **업!**\n하틴봇의 숫자가 {guess}보다 더 크네요!")
                 elif guess > game["number"]:
-                    await message.channel.send(f"🔻 **다운!**\n하틴봇의 숫자가 더 작네요!")
+                    await message.channel.send(f"🔻 **다운!**\n하틴봇의 숫자가 {guess}보다 더 작네요!")
                 else:
                     await message.channel.send(f"🎉 **정답입니다!**\n답은 **{game['number']}**입니다!\n총 시도 횟수: {game['attempts']}번")
                     del self.games[message.author.id]

@@ -70,6 +70,23 @@ class Draw(commands.Cog):
         with open(self.second_place_file, "a", encoding="utf-8") as f:
             f.write(record + "\n")
 
+    @commands.command(name="뽑기1등")
+    async def show_first_place_records(self, ctx):
+        if not self.first_place_records:
+            await ctx.send("📜 1등 기록이 없습니다!")
+        else:
+            records = "\n".join(self.first_place_records[-10:])  # 최근 10개만 표시
+            await ctx.send(f"🏆 **최근 1등 기록:**\n{records}")
+    
+    @commands.command(name="뽑기2등")
+    async def show_second_place_records(self, ctx):
+        if not self.second_place_records:
+            await ctx.send("📜 2등 기록이 없습니다!")
+        else:
+            records = "\n".join(self.second_place_records[-10:])  # 최근 10개만 표시
+            await ctx.send(f"🥈 **최근 2등 기록:**\n{records}")
+
+
     @commands.command(name="뽑기", aliases=["가챠"])
     async def draw(self, ctx, num: str = None):
         if num:

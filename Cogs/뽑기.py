@@ -54,7 +54,8 @@ class Draw(commands.Cog):
             "일반": self.items[12:16],
             "하급": self.items[16:20],
             "최하급": self.items[20:24],
-            "쓰레기": self.items[24:]
+            "쓰레기1": self.items[24:28],
+            "쓰레기2": self.items[28:]
         }
 
         # 각 그룹별 메시지
@@ -66,7 +67,8 @@ class Draw(commands.Cog):
             "일반": "😐 **나쁘지 않아요. 무난한 선택입니다.**",
             "하급": "😅 **조금 아쉽지만 사용할 만한 아이템이군요.**",
             "최하급": "🙄 **이걸로 뭘 할 수 있을까요? 그다지 유용하진 않네요.**",
-            "쓰레기": "😢 **...이걸 왜 뽑았을까요? 그냥 버려도 될 것 같은데요.**"
+            "쓰레기1": "😢 **운이 정말 없네요... 이걸로 뭐할 수 있을까요?**",
+            "쓰레기2": "🗑️ **이건 진짜 쓰레기네요... 그냥 버리는 게 나을지도?**"
         }
 
     @commands.command(name="뽑기", aliases=["가챠"])
@@ -90,7 +92,7 @@ class Draw(commands.Cog):
                 break
 
         # 해당 아이템이 속한 그룹 찾기
-        selected_group = next((group for group, items in self.item_groups.items() if selected_item in dict(items)), "쓰레기")
+        selected_group = next((group for group, items in self.item_groups.items() if selected_item in dict(items)), "쓰레기1")
         result_message = self.group_messages[selected_group]
 
         embed = discord.Embed(

@@ -24,8 +24,17 @@ class UpDownGame(commands.Cog):
             return
 
         secret_number = random.randint(1, max_number)
-        self.games[ctx.author.id] = {"number": secret_number, "attempts": 0, "guesses": []}
-        await ctx.send(f"🎮 {ctx.author.mention}님, 1부터 {max_number} 사이의 숫자를 맞혀보세요!\n(게임을 종료하려면 #업다운그만 입력)\n(내가 입력한 숫자와 결과를 한눈에 볼려면 #업다운종합 입력)")
+        self.games[ctx.author.id] = {"number": secret_number, "attempts": 0, "guesses": [], "last_activity": asyncio.get_event_loop().time()}
+        await ctx.send(f"🎮 {ctx.author.mention}님,\n1부터 {max_number} 사이의 숫자를 맞혀보세요!\n(게임을 종료하려면 #업다운그만 입력)\n(내가 입력한 숫자와 결과를 한눈에 볼려면 #업다운종합 입력)")
+        
+        await self.auto_end_game(ctx.author.id, ctx)
+
+    async def auto_end_game(self, player_id, ctx):
+        await asyncio.sleep(100)
+        game = self.games.get(player_id)
+        if game and asyncio.get_event_loop().time() - game["last_activity"] >= 100:
+            del self.games[player_id]
+            await ctx.send(f"⏳ {ctx.author.mention}님, 2분 동안 응답이 없어 게임이 자동 종료되었습니다. 하틴봇이 선정한 숫자는 **{game['number']}**였습니다!")
 
     @commands.command(name="업다운그만")
     async def stop_updown(self, ctx):
@@ -55,6 +64,7 @@ class UpDownGame(commands.Cog):
         
         if message.author.id in self.games:
             game = self.games[message.author.id]
+            game["last_activity"] = asyncio.get_event_loop().time()
             
             if message.content.isdigit():
                 guess = int(message.content)

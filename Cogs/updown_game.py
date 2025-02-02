@@ -40,8 +40,9 @@ class UpDownGame(commands.Cog):
             return
         
         game = self.games[ctx.author.id]
-        guesses = ", ".join(map(str, game["guesses"])) if game["guesses"] else "없음"
-        await ctx.send(f"📊 **업다운 게임 종합 정보**\n🧐 시도한 숫자들: {guesses}\n🎯 총 시도 횟수: {game['attempts']}번")
+        results = "\n".join([f"입력한 숫자: {guess} | 결과: {'업' if guess < game['number'] else '다운'}" for guess in game["guesses"]])
+        results = results if results else "없음"
+        await ctx.send(f"📊 **업다운 게임 종합 정보**\n{results}\n🎯 총 시도 횟수: {game['attempts']}번")
 
     @commands.Cog.listener()
     async def on_message(self, message):

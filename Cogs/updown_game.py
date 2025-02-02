@@ -25,7 +25,7 @@ class UpDownGame(commands.Cog):
 
         secret_number = random.randint(1, max_number)
         self.games[ctx.author.id] = {"number": secret_number, "attempts": 0, "guesses": []}
-        await ctx.send(f"🎮 {ctx.author.mention}님, 1부터 {max_number} 사이의 숫자를 맞혀보세요!\n(게임을 종료하려면 #업다운그만 입력)\n(내가 입력한 숫자와 결과를 한눈에 볼려면 #업다운종합 입력")
+        await ctx.send(f"🎮 {ctx.author.mention}님, 1부터 {max_number} 사이의 숫자를 맞혀보세요!\n(게임을 종료하려면 #업다운그만 입력)\n(내가 입력한 숫자와 결과를 한눈에 볼려면 #업다운종합 입력)")
 
     @commands.command(name="업다운그만")
     async def stop_updown(self, ctx):
@@ -44,7 +44,7 @@ class UpDownGame(commands.Cog):
             return
         
         game = self.games[ctx.author.id]
-        results = "\n".join([f"{i+1}번째 입력한 숫자: {guess} | 결과: {'업' if guess < game['number'] else '다운'}" for i, guess in enumerate(game["guesses"])])
+        results = "\n".join([f"{i+1}번째 입력한 숫자: {guess} | 결과: {'업🔺' if guess < game['number'] else '다운🔻'}" for i, guess in enumerate(game["guesses"])])
         results = results if results else "없음"
         await ctx.send(f"📊 **업다운 게임 종합 정보**\n{results}\n🎯 총 시도 횟수: {game['attempts']}번")
 

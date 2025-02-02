@@ -21,7 +21,7 @@ class UpDownGame(commands.Cog):
 
         secret_number = random.randint(1, max_number)
         self.games[ctx.author.id] = {"number": secret_number, "attempts": 0, "guesses": []}
-        await ctx.send(f"🎮 {ctx.author.mention}, 1부터 {max_number} 사이의 숫자를 맞혀보세요! (게임을 종료하려면 #업다운그만 입력)")
+        await ctx.send(f"🎮 {ctx.author.mention}님, 1부터 {max_number} 사이의 숫자를 맞혀보세요! (게임을 종료하려면 #업다운그만 입력)")
 
     @commands.command(name="업다운그만")
     async def stop_updown(self, ctx):

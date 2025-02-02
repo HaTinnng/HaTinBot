@@ -38,19 +38,23 @@ class Draw(commands.Cog):
             ("헛된 나뭇가지", 8.19),
             ("고장난 시계", 8.49),
             ("찢어진 신문", 8.79),
-            ("빈 병", 9.09)  # 확률 정규화하여 정상적으로 선택되도록 보장
+            ("빈 병", 9.09)
         ]
+
+        # 확률 정규화 (총합 100% 보장)
+        total_probability = sum(prob for _, prob in self.items)
+        self.items = [(item, prob / total_probability * 100) for item, prob in self.items]
 
         # 아이템을 희귀도에 따라 그룹화
         self.item_groups = {
-            "전설": self.items[:1],  # 1개
-            "최고급": self.items[1:4],  # 3개
-            "고급": self.items[4:8],  # 4개
-            "중급": self.items[8:12],  # 4개
-            "일반": self.items[12:16],  # 4개
-            "하급": self.items[16:20],  # 4개
-            "최하급": self.items[20:24],  # 4개
-            "쓰레기": self.items[24:]  # 빈 병 포함
+            "전설": self.items[:1],
+            "최고급": self.items[1:4],
+            "고급": self.items[4:8],
+            "중급": self.items[8:12],
+            "일반": self.items[12:16],
+            "하급": self.items[16:20],
+            "최하급": self.items[20:24],
+            "쓰레기": self.items[24:]
         }
 
         # 각 그룹별 메시지
@@ -78,6 +82,7 @@ class Draw(commands.Cog):
         rand_value = random.uniform(0, 100)  # 0~100 범위의 랜덤 값
         cumulative_probability = 0
 
+        selected_item = "빈 병"  # 기본값 설정 (마지막 아이템 보장)
         for item, probability in self.items:
             cumulative_probability += probability
             if rand_value <= cumulative_probability:
@@ -89,7 +94,7 @@ class Draw(commands.Cog):
         result_message = self.group_messages[selected_group]
 
         embed = discord.Embed(
-            title="**상품을 뽑았습니다!**", 
+            title="**상품을 뽑았습니다!**",
             description="**결과는!**",
             color=discord.Color.green()
         )

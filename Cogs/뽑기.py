@@ -126,7 +126,7 @@ class Draw(commands.Cog):
 
         embed = discord.Embed(
             title="**상품을 뽑았습니다!**",
-            description=rarity_messages.get(item_rarity, "🎁 예상치 못한 아이템이 나왔습니다!"),
+            description=f"🎉 {selected_item}을(를) 획득하셨습니다!\n{rarity_messages.get(item_rarity, '🎁 예상치 못한 아이템이 나왔습니다!')}\n",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)

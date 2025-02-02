@@ -50,7 +50,7 @@ class Draw(commands.Cog):
             "일반": self.items[12:16],  # 4개
             "하급": self.items[16:20],  # 4개
             "최하급": self.items[20:24],  # 4개
-            "쓰레기": self.items[24:-1]  # 빈 병 제외
+            "쓰레기": self.items[24:]  # 빈 병 포함
         }
 
         # 각 그룹별 메시지
@@ -64,9 +64,6 @@ class Draw(commands.Cog):
             "최하급": "🙄 **이걸로 뭘 할 수 있을까요? 그다지 유용하진 않네요.**",
             "쓰레기": "😢 **...이걸 왜 뽑았을까요? 그냥 버려도 될 것 같은데요.**"
         }
-
-        # 빈 병 전용 메시지
-        self.bin_bottle_message = "🫗 **아... 빈 병을 뽑았군요. 정말 운이 없네요...** 😭"
 
     @commands.command(name="뽑기", aliases=["가챠"])
     async def draw(self, ctx, num: str = None):
@@ -89,12 +86,9 @@ class Draw(commands.Cog):
         else:
             selected_item = "빈 병"
 
-        # 빈 병이면 별도 메시지 출력
-        if selected_item == "빈 병":
-            result_message = self.bin_bottle_message
-        else:
-            selected_group = next((group for group, items in self.item_groups.items() if selected_item in dict(items)), "쓰레기")
-            result_message = self.group_messages[selected_group]
+        # 해당 아이템이 속한 그룹 찾기
+        selected_group = next((group for group, items in self.item_groups.items() if selected_item in dict(items)), "쓰레기")
+        result_message = self.group_messages[selected_group]
 
         embed = discord.Embed(
             title="**상품을 뽑았습니다!**", 

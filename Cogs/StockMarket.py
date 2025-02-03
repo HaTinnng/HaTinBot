@@ -187,34 +187,43 @@ class StockCog(commands.Cog):
         next_time, delta = self.get_next_update_info()
         await ctx.send(f"다음 변동 시각: {next_time.strftime('%H:%M:%S')} (남은 시간: {str(delta).split('.')[0]})")
 
-    @commands.command(name="주식구매")
-    async def buy_stock(self, ctx, stock_id: str, amount: int):
-        """예시: #주식구매 3 10 – 해당 주식 번호의 주식을 지정 수량만큼 구매합니다."""
+       @commands.command(name="주식구매")
+    async def buy_stock(self, ctx, stock_name: str, amount: int):
+        """예시: #주식구매 썬더타이어 10 – 해당 주식 이름의 주식을 지정 수량만큼 구매합니다."""
         now = self.get_seoul_time()
         if now.day in [1, 2]:
             await ctx.send("현재 주식 거래가 중단되어 있습니다. (시즌 종료 및 휴식 기간)")
-            return
-        if stock_id not in self.data["stocks"]:
-            await ctx.send("존재하지 않는 주식 번호입니다.")
             return
         user_id = str(ctx.author.id)
         if user_id not in self.data["users"]:
             await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
             return
-        user = self.data["users"][user_id]
-        price = self.data["stocks"][stock_id]["price"]
+
+        # 주식 이름으로 검색 (정확한 이름 입력 필요)
+        found_stock_id = None
+        for stock_id, stock in self.data["stocks"].items():
+            if stock["name"] == stock_name:
+                found_stock_id = stock_id
+                break
+        if not found_stock_id:
+            await ctx.send("존재하지 않는 주식 종목입니다.")
+            return
+
+        stock = self.data["stocks"][found_stock_id]
+        price = stock["price"]
         total_cost = price * amount
+        user = self.data["users"][user_id]
         if user["money"] < total_cost:
             await ctx.send("잔액이 부족합니다.")
             return
         user["money"] -= total_cost
-        user["portfolio"][stock_id] = user["portfolio"].get(stock_id, 0) + amount
+        user["portfolio"][found_stock_id] = user["portfolio"].get(found_stock_id, 0) + amount
         save_data(self.data)
-        await ctx.send(f"{ctx.author.mention}님이 {self.data['stocks'][stock_id]['name']} 주식을 {amount}주 구매하였습니다. (총 {total_cost}원)")
+        await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {amount}주 구매하였습니다. (총 {total_cost}원)")
 
     @commands.command(name="주식판매")
-    async def sell_stock(self, ctx, stock_id: str, amount: int):
-        """예시: #주식판매 3 5 – 해당 주식 번호의 주식을 지정 수량만큼 판매합니다."""
+    async def sell_stock(self, ctx, stock_name: str, amount: int):
+        """예시: #주식판매 썬더타이어 5 – 해당 주식 이름의 주식을 지정 수량만큼 판매합니다."""
         now = self.get_seoul_time()
         if now.day in [1, 2]:
             await ctx.send("현재 주식 거래가 중단되어 있습니다. (시즌 종료 및 휴식 기간)")
@@ -223,18 +232,32 @@ class StockCog(commands.Cog):
         if user_id not in self.data["users"]:
             await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
             return
+
+        # 주식 이름으로 검색
+        found_stock_id = None
+        for stock_id, stock in self.data["stocks"].items():
+            if stock["name"] == stock_name:
+                found_stock_id = stock_id
+                break
+        if not found_stock_id:
+            await ctx.send("존재하지 않는 주식 종목입니다.")
+            return
+
         user = self.data["users"][user_id]
-        if user["portfolio"].get(stock_id, 0) < amount:
+        if user["portfolio"].get(found_stock_id, 0) < amount:
             await ctx.send("판매할 주식 보유 수량이 부족합니다.")
             return
-        price = self.data["stocks"][stock_id]["price"]
+
+        stock = self.data["stocks"][found_stock_id]
+        price = stock["price"]
         revenue = price * amount
         user["money"] += revenue
-        user["portfolio"][stock_id] -= amount
-        if user["portfolio"][stock_id] <= 0:
-            del user["portfolio"][stock_id]
+        user["portfolio"][found_stock_id] -= amount
+        if user["portfolio"][found_stock_id] <= 0:
+            del user["portfolio"][found_stock_id]
         save_data(self.data)
-        await ctx.send(f"{ctx.author.mention}님이 {self.data['stocks'][stock_id]['name']} 주식을 {amount}주 판매하여 {revenue}원을 획득하였습니다.")
+        await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {amount}주 판매하여 {revenue}원을 획득하였습니다.")
+
 
     @commands.command(name="프로필")
     async def profile(self, ctx):

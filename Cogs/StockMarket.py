@@ -309,7 +309,6 @@ class StockMarket(commands.Cog):
             msg_lines.append(f"{idx}. {name} - {total}원")
         await ctx.send("\n".join(msg_lines))
 
-      await ctx.send(f"⏳ 다음 주식 변동까지 {remaining_time.seconds // 60}분 남았습니다. 갱신 시간: {next_update_time.strftime('%H:%M')} KST")
 
     @commands.command(name="시즌")
     async def season_info(self, ctx):

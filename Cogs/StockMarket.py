@@ -187,7 +187,7 @@ class StockCog(commands.Cog):
         next_time, delta = self.get_next_update_info()
         await ctx.send(f"다음 변동 시각: {next_time.strftime('%H:%M:%S')} (남은 시간: {str(delta).split('.')[0]})")
 
-       @commands.command(name="주식구매")
+    @commands.command(name="주식구매")
     async def buy_stock(self, ctx, stock_name: str, amount: int):
         """예시: #주식구매 썬더타이어 10 – 해당 주식 이름의 주식을 지정 수량만큼 구매합니다."""
         now = self.get_seoul_time()

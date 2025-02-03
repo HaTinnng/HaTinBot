@@ -166,7 +166,7 @@ class StockMarket(commands.Cog):
         delta = next_time - now
         return next_time, delta
 
-    @commands.command(name="주식참가")
+    @commands.command(name="주식참가", aliases=["주식참여","주식시작"])
     async def join_stock(self, ctx):
         """#주식참가: 처음 참가 시 500,000원을 지급받습니다."""
         user_id = str(ctx.author.id)
@@ -177,7 +177,7 @@ class StockMarket(commands.Cog):
         save_data(self.data)
         await ctx.send(f"{ctx.author.mention}님, 주식 게임에 참가하셨습니다! 초기 자금 {JOIN_BONUS}원을 지급받았습니다.")
 
-    @commands.command(name="주식")
+    @commands.command(name="주식",aliases=["주식목록","현재가"])
     async def show_stocks(self, ctx):
         """#주식: 전체 주식 목록(종목명, 가격, 변동 내역)을 출력합니다."""
         msg_lines = []
@@ -192,7 +192,7 @@ class StockMarket(commands.Cog):
             msg_lines.append(line)
         await ctx.send("\n".join(msg_lines))
 
-    @commands.command(name="다음변동")
+    @commands.command(name="다음변동",aliases=["변동","변동시간"])
     async def next_update(self, ctx):
         """#다음변동: 다음 주식 변동 시각과 남은 시간을 안내합니다."""
         next_time, delta = self.get_next_update_info()
@@ -268,7 +268,7 @@ class StockMarket(commands.Cog):
         save_data(self.data)
         await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {amount}주 판매하여 {revenue}원을 획득하였습니다.")
 
-    @commands.command(name="프로필")
+    @commands.command(name="프로필",aliases=["보관함"])
     async def profile(self, ctx):
         """
         #프로필: 자신의 잔액, 보유 주식(종목명 및 현재가)과 획득한 칭호(예: '2025 시즌2 TOP2')를 보여줍니다.

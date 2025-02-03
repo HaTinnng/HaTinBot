@@ -13,6 +13,10 @@ class StockMarket(commands.Cog):
         self.kst = pytz.timezone("Asia/Seoul")
         self.previous_prices = {}
         self.update_stocks.start()
+        self.initialize_database()
+        self.load_stocks()
+        self.load_users() 
+        
 
         self.initialize_database()
         self.load_stocks()
@@ -87,6 +91,28 @@ class StockMarket(commands.Cog):
             c.execute("UPDATE stocks SET price = ? WHERE stock = ?", (price, stock))
         conn.commit()
         conn.close()
+        
+    def load_users(self):
+    """봇이 시작될 때 유저 데이터를 불러오는 함수"""
+    conn = sqlite3.connect(self.db_path)
+    c = conn.cursor()
+    
+    # 모든 유저의 보유 금액 불러오기
+    c.execute("SELECT user_id, balance FROM users")
+    user_data = c.fetchall()
+    self.users = {user_id: balance for user_id, balance in user_data}
+
+    # 유저별 보유 주식 불러오기
+    c.execute("SELECT user_id, stock, shares FROM portfolio")
+    portfolio_data = c.fetchall()
+    self.portfolios = {}
+    for user_id, stock, shares in portfolio_data:
+        if user_id not in self.portfolios:
+            self.portfolios[user_id] = {}
+        self.portfolios[user_id][stock] = shares
+
+    conn.close()
+    
 
     @tasks.loop(seconds=60)
     async def update_stocks(self):

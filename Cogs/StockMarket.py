@@ -274,4 +274,4 @@ class StockCog(commands.Cog):
         await ctx.send("\n".join(msg_lines))
 
 def setup(bot):
-    bot.add_cog(StockCog(bot))
+    await bot.add_cog(StockCog(bot))

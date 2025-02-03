@@ -273,5 +273,5 @@ class StockCog(commands.Cog):
             msg_lines.append(f"{idx}. {name} - {total}원")
         await ctx.send("\n".join(msg_lines))
 
-def setup(bot):
+async def setup(bot):
     await bot.add_cog(StockCog(bot))

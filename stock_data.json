@@ -1,0 +1,86 @@
+{
+  "stocks": {
+    "1": {
+      "name": "311유통",
+      "price": 57,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "2": {
+      "name": "썬더타이어",
+      "price": 482,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "3": {
+      "name": "룡치수산",
+      "price": 520,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "4": {
+      "name": "맥턴맥주",
+      "price": 3245,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "5": {
+      "name": "섹보경컬쳐",
+      "price": 2710,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "6": {
+      "name": "전차수리점",
+      "price": 12500,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "7": {
+      "name": "디코커피",
+      "price": 17600,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "8": {
+      "name": "와이제이엔터",
+      "price": 35000,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "9": {
+      "name": "이리여행사",
+      "price": 42500,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "10": {
+      "name": "하틴봇전자",
+      "price": 60000,
+      "last_change": 0,
+      "percent_change": 0
+    },
+    "11": {
+      "name": "하틴출판사",
+      "price": 85000,
+      "last_change": 0,
+      "percent_change": 0
+    }
+  },
+  "users": {
+    "123456789012345678": {
+      "money": 500000,
+      "portfolio": {
+        "1": 10,
+        "3": 5
+      },
+      "titles": [
+      ]
+    }
+  },
+  "season": {
+    "year": 2025,
+    "season_no": 2,
+    "last_reset": "2025-02-01 00:00:00"
+  }
+}

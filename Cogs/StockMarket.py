@@ -126,9 +126,8 @@ class StockMarket(commands.Cog):
         embed = discord.Embed(title=f"{ctx.author.display_name}님의 프로필", description=desc, color=discord.Color.green())
         await ctx.send(embed=embed)
 
-  
-    @commands.command(name="랭킹")
-    async def ranking(self, ctx):
+    @commands.command(name="주식랭킹")
+    async def stock_ranking(self, ctx):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         c.execute("SELECT user_id, balance FROM users ORDER BY balance DESC LIMIT 10")

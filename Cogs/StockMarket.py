@@ -6,7 +6,7 @@ import pytz
 
 # 상수 설정
 JOIN_BONUS = 500000        # #주식참가 시 지급 자금
-DEFAULT_MONEY = 500000     # 시즌 초기화 후 유저 기본 잔액
+DEFAULT_MONEY = 100000     # 시즌 초기화 후 유저 기본 잔액
 DATA_FILE = "stock_data.json"  # JSON 저장 파일명
 
 def init_stocks():
@@ -102,13 +102,14 @@ class StockMarket(commands.Cog):
     @tasks.loop(seconds=10)
     async def stock_update_loop(self):
         """
-        매 10초마다 현재 시간이 한국시간의 0초, 20초, 40초(분:초 0)인지 확인하고 주식 가격을 업데이트합니다.
-        거래 중단 기간(1일, 2일)에는 업데이트하지 않습니다.
+        매 10초마다 현재 시간이 한국시간의 0, 20, 40분일 때 주식 가격을 업데이트합니다.
+        (이전에 한 번 업데이트한 분은 다시 업데이트하지 않습니다.)
         """
         now = self.get_seoul_time()
         if now.day in [1, 2]:
             return
-        if now.second == 0 and now.minute in [0, 20, 40]:
+        # 초 조건은 제거하고 분만 확인합니다.
+        if now.minute in [0, 20, 40]:
             if self.last_update_min != now.minute:
                 self.update_stocks()
                 self.last_update_min = now.minute
@@ -166,7 +167,7 @@ class StockMarket(commands.Cog):
         delta = next_time - now
         return next_time, delta
 
-    @commands.command(name="주식참가", aliases=["주식참여","주식시작"])
+    @commands.command(name="주식참가", aliases=["주식참여", "주식시작"])
     async def join_stock(self, ctx):
         """#주식참가: 처음 참가 시 500,000원을 지급받습니다."""
         user_id = str(ctx.author.id)
@@ -271,23 +272,35 @@ class StockMarket(commands.Cog):
     @commands.command(name="프로필", aliases=["보관함"])
     async def profile(self, ctx):
         """
-        #프로필: 자신의 잔액, 보유 주식(종목명 및 현재가)과 획득한 칭호(예: '2025 시즌2 TOP2')를 보여줍니다.
+        #프로필: 자신의 보유 현금, 각 종목별 주식 보유량과 해당 종목의 총 평가액,
+        그리고 (현금 + 주식 평가액)의 전체 자산을 보여줍니다.
         """
         user_id = str(ctx.author.id)
         if user_id not in self.data["users"]:
             await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
             return
         user = self.data["users"][user_id]
+        total_stock_value = 0
         portfolio_lines = []
         for sid, amount in user.get("portfolio", {}).items():
             stock = self.data["stocks"].get(sid, {})
-            portfolio_lines.append(f"{stock.get('name', 'Unknown')}: {amount}주 (현재가: {stock.get('price', 0)}원)")
+            current_price = stock.get("price", 0)
+            stock_value = current_price * amount
+            total_stock_value += stock_value
+            portfolio_lines.append(
+                f"{stock.get('name', 'Unknown')}: {amount}주 (현재가: {current_price}원, 총액: {stock_value}원)"
+            )
         portfolio_str = "\n".join(portfolio_lines) if portfolio_lines else "보유 주식 없음"
+        total_assets = user.get("money", DEFAULT_MONEY) + total_stock_value
         titles_str = ", ".join(user.get("titles", [])) if user.get("titles", []) else "없음"
-        msg = (f"**{ctx.author.display_name}님의 프로필**\n"
-               f"잔액: {user['money']}원\n"
-               f"보유 주식:\n{portfolio_str}\n"
-               f"칭호: {titles_str}")
+        msg = (
+            f"**{ctx.author.display_name}님의 프로필**\n"
+            f"현금 잔액: {user['money']}원\n"
+            f"보유 주식 총액: {total_stock_value}원\n"
+            f"전체 자산 (현금 + 주식): {total_assets}원\n\n"
+            f"보유 주식:\n{portfolio_str}\n"
+            f"칭호: {titles_str}"
+        )
         await ctx.send(msg)
 
     @commands.command(name="랭킹")
@@ -326,7 +339,6 @@ class StockMarket(commands.Cog):
         else:
             next_year = now.year
             next_month = now.month + 1
-        # pytz의 localize를 사용하여 tz-aware datetime 객체 생성
         season_end = tz.localize(datetime(year=next_year, month=next_month, day=1, hour=0, minute=0, second=0))
         remaining = season_end - now
         days = remaining.days

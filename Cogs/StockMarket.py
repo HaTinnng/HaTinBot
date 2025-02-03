@@ -6,7 +6,7 @@ import pytz
 
 # 상수 설정
 JOIN_BONUS = 500000        # #주식참가 시 지급 자금
-DEFAULT_MONEY = 100000     # 시즌 초기화 후 유저 기본 잔액
+DEFAULT_MONEY = 500000     # 시즌 초기화 후 유저 기본 잔액
 DATA_FILE = "stock_data.json"  # JSON 저장 파일명
 
 def init_stocks():
@@ -102,7 +102,7 @@ class StockMarket(commands.Cog):
     @tasks.loop(seconds=10)
     async def stock_update_loop(self):
         """
-        매 10초마다 현재 시간이 한국시간의 0분, 20분, 40분(초 0)인지 확인하고 주식 가격을 업데이트합니다.
+        매 10초마다 현재 시간이 한국시간의 0초, 20초, 40초(분:초 0)인지 확인하고 주식 가격을 업데이트합니다.
         거래 중단 기간(1일, 2일)에는 업데이트하지 않습니다.
         """
         now = self.get_seoul_time()
@@ -177,7 +177,7 @@ class StockMarket(commands.Cog):
         save_data(self.data)
         await ctx.send(f"{ctx.author.mention}님, 주식 게임에 참가하셨습니다! 초기 자금 {JOIN_BONUS}원을 지급받았습니다.")
 
-    @commands.command(name="주식",aliases=["주식목록","현재가"])
+    @commands.command(name="주식", aliases=["주식목록", "현재가"])
     async def show_stocks(self, ctx):
         """#주식: 전체 주식 목록(종목명, 가격, 변동 내역)을 출력합니다."""
         msg_lines = []
@@ -192,7 +192,7 @@ class StockMarket(commands.Cog):
             msg_lines.append(line)
         await ctx.send("\n".join(msg_lines))
 
-    @commands.command(name="다음변동",aliases=["변동","변동시간"])
+    @commands.command(name="다음변동", aliases=["변동", "변동시간"])
     async def next_update(self, ctx):
         """#다음변동: 다음 주식 변동 시각과 남은 시간을 안내합니다."""
         next_time, delta = self.get_next_update_info()
@@ -268,7 +268,7 @@ class StockMarket(commands.Cog):
         save_data(self.data)
         await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {amount}주 판매하여 {revenue}원을 획득하였습니다.")
 
-    @commands.command(name="프로필",aliases=["보관함"])
+    @commands.command(name="프로필", aliases=["보관함"])
     async def profile(self, ctx):
         """
         #프로필: 자신의 잔액, 보유 주식(종목명 및 현재가)과 획득한 칭호(예: '2025 시즌2 TOP2')를 보여줍니다.
@@ -308,17 +308,37 @@ class StockMarket(commands.Cog):
             name = user_obj.display_name if user_obj else f"ID:{uid}"
             msg_lines.append(f"{idx}. {name} - {total}원")
         await ctx.send("\n".join(msg_lines))
-
-
+    
     @commands.command(name="시즌")
     async def season_info(self, ctx):
-        now = datetime.now(self.kst)
-        season_end = datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=self.kst)
-        if now >= season_end:
-            season_end = datetime(now.year, now.month + 1, 1, 0, 0, 0, tzinfo=self.kst)
-        remaining_time = season_end - now
-        await ctx.send(f"📅 현재 시즌 종료까지 {remaining_time.days}일 {remaining_time.seconds // 3600}시간 남았습니다. 종료 시간: {season_end.strftime('%Y-%m-%d %H:%M')} KST")
-
+        """
+        #시즌: 현재 시즌명과 시즌 종료 시각, 남은 시간을 보여줍니다.
+        시즌 종료 시각은 다음 달 1일 00:00:00 (한국시간 기준)으로 계산합니다.
+        """
+        # 현재 시즌명 (예: "2025 시즌2")
+        season_name = f"{self.data['season']['year']} 시즌{self.data['season']['season_no']}"
+        now = self.get_seoul_time()
+        tz = pytz.timezone("Asia/Seoul")
+        # 다음 달 1일 00:00:00을 시즌 종료 시각으로 설정
+        if now.month == 12:
+            next_year = now.year + 1
+            next_month = 1
+        else:
+            next_year = now.year
+            next_month = now.month + 1
+        # pytz의 localize를 사용하여 tz-aware datetime 객체 생성
+        season_end = tz.localize(datetime(year=next_year, month=next_month, day=1, hour=0, minute=0, second=0))
+        remaining = season_end - now
+        days = remaining.days
+        hours, remainder = divmod(remaining.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        remaining_str = f"{days}일 {hours}시간 {minutes}분 {seconds}초"
+    
+        await ctx.send(
+            f"현재 시즌: **{season_name}**\n"
+            f"시즌 종료 시각: {season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"남은 시간: {remaining_str}"
+        )
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

@@ -309,5 +309,17 @@ class StockMarket(commands.Cog):
             msg_lines.append(f"{idx}. {name} - {total}원")
         await ctx.send("\n".join(msg_lines))
 
+      await ctx.send(f"⏳ 다음 주식 변동까지 {remaining_time.seconds // 60}분 남았습니다. 갱신 시간: {next_update_time.strftime('%H:%M')} KST")
+
+    @commands.command(name="시즌")
+    async def season_info(self, ctx):
+        now = datetime.now(self.kst)
+        season_end = datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=self.kst)
+        if now >= season_end:
+            season_end = datetime(now.year, now.month + 1, 1, 0, 0, 0, tzinfo=self.kst)
+        remaining_time = season_end - now
+        await ctx.send(f"📅 현재 시즌 종료까지 {remaining_time.days}일 {remaining_time.seconds // 3600}시간 남았습니다. 종료 시간: {season_end.strftime('%Y-%m-%d %H:%M')} KST")
+
+
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

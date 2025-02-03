@@ -13,7 +13,6 @@ class StockMarket(commands.Cog):
         self.kst = pytz.timezone("Asia/Seoul")
         self.previous_prices = {}
         self.update_stocks.start()
-        self.reset_season.start()
 
         self.initialize_database()
         self.load_stocks()
@@ -125,27 +124,6 @@ class StockMarket(commands.Cog):
         else:
             desc += "없음"
         embed = discord.Embed(title=f"{ctx.author.display_name}님의 프로필", description=desc, color=discord.Color.green())
-        await ctx.send(embed=embed)
-
-    @commands.command(name="주식랭킹")
-    async def stock_ranking(self, ctx):
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        c.execute("SELECT user_id, balance FROM users ORDER BY balance DESC LIMIT 10")
-        rankings = c.fetchall()
-        conn.close()
-
-        if not rankings:
-            await ctx.send("📉 현재 주식 시장에 참여한 유저가 없습니다.")
-            return
-
-        ranking_list = []
-        for i, (user_id, balance) in enumerate(rankings, start=1):
-            user = self.bot.get_user(user_id)
-            username = user.name if user else f"유저 {user_id}"
-            ranking_list.append(f"**{i}등**: {username} - 💰 {balance:,}원")
-
-        embed = discord.Embed(title="🏆 주식 랭킹 (보유 자산 TOP 10)", description="\n".join(ranking_list), color=discord.Color.gold())
         await ctx.send(embed=embed)
 
 async def setup(bot):

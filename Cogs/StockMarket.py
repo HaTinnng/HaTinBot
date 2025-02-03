@@ -167,6 +167,70 @@ class StockMarket(commands.Cog):
         remaining_time = season_end - now
         await ctx.send(f"📅 현재 시즌 종료까지 {remaining_time.days}일 {remaining_time.seconds // 3600}시간 남았습니다. 종료 시간: {season_end.strftime('%Y-%m-%d %H:%M')} KST")
 
+    @commands.command(name="주식시작")
+    async def join_stock_market(self, ctx):
+        user_id = ctx.author.id
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+        if c.fetchone():
+            await ctx.send(f"✅ {ctx.author.mention}님은 이미 주식 시장에 참여하고 있습니다!")
+            conn.close()
+            return
+        c.execute("INSERT INTO users (user_id, balance) VALUES (?, ?)", (user_id, self.base_fund))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"🎉 {ctx.author.mention}님이 주식 시장에 참여했습니다! 기본금 {self.base_fund:,}원이 지급됩니다.")
+
+    @commands.command(name="주식구매")
+    async def buy_stock(self, ctx, stock: str, amount: int):
+        user_id = ctx.author.id
+        stock = stock.upper()
+        if stock not in self.stocks or self.stocks[stock] == 0:
+            await ctx.send("❌ 해당 주식은 존재하지 않거나 상장폐지되었습니다.")
+            return
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+        result = c.fetchone()
+        if result is None:
+            await ctx.send("❌ 주식 시장에 참여하지 않았습니다. `#주식시작`을 입력하세요.")
+            conn.close()
+            return
+        balance = result[0]
+        total_price = self.stocks[stock] * amount
+        if balance < total_price:
+            await ctx.send("❌ 잔고가 부족합니다.")
+            conn.close()
+            return
+        c.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (total_price, user_id))
+        c.execute("INSERT INTO portfolio (user_id, stock, shares) VALUES (?, ?, ?) ON CONFLICT(user_id, stock) DO UPDATE SET shares = shares + ?",
+                  (user_id, stock, amount, amount))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"✅ {ctx.author.mention}님이 {stock} {amount}주를 구매하였습니다.")
+
+    @commands.command(name="주식판매")
+    async def sell_stock(self, ctx, stock: str, amount: int):
+        user_id = ctx.author.id
+        stock = stock.upper()
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT shares FROM portfolio WHERE user_id = ? AND stock = ?", (user_id, stock))
+        result = c.fetchone()
+        if result is None or result[0] < amount:
+            await ctx.send("❌ 보유 주식이 부족합니다.")
+            conn.close()
+            return
+        total_price = self.stocks[stock] * amount
+        c.execute("UPDATE portfolio SET shares = shares - ? WHERE user_id = ? AND stock = ?", (amount, user_id, stock))
+        c.execute("DELETE FROM portfolio WHERE user_id = ? AND stock = ? AND shares = 0", (user_id, stock))
+        c.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (total_price, user_id))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"✅ {ctx.author.mention}님이 {stock} {amount}주를 판매하였습니다.")
+
+
 
 
 async def setup(bot):

@@ -126,5 +126,124 @@ class StockMarket(commands.Cog):
         embed = discord.Embed(title=f"{ctx.author.display_name}님의 프로필", description=desc, color=discord.Color.green())
         await ctx.send(embed=embed)
 
+    @commands.command(name="주식정보")
+    async def stock_info(self, ctx):
+        embed = discord.Embed(title="📈 현재 주식 시장 상황", color=discord.Color.blue())
+        for stock, price in self.stocks.items():
+            prev_price = self.previous_prices.get(stock, price)
+            change = price - prev_price
+            change_symbol = "🔺" if change > 0 else "🔻" if change < 0 else "➖"
+            formatted_change = f"({change_symbol}{abs(change)})(변동률: {change / prev_price * 100:.1f}%)"
+            value = f"{price:,}원 {formatted_change}" if price > 0 else "**상장폐지**"
+            embed.add_field(name=f"🟢 {stock}" if price > 0 else f"🔴 {stock}", value=value, inline=False)
+        embed.set_footer(text="💡 20분 후 가격이 변동됩니다.")
+        await ctx.send(embed=embed)
+
+    @commands.command(name="주식참가")
+    async def join_stock_market(self, ctx):
+        user_id = ctx.author.id
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+        if c.fetchone():
+            await ctx.send(f"✅ {ctx.author.mention}님은 이미 주식 시장에 참여하고 있습니다!")
+            conn.close()
+            return
+        c.execute("INSERT INTO users (user_id, balance) VALUES (?, ?)", (user_id, self.base_fund))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"🎉 {ctx.author.mention}님이 주식 시장에 참여했습니다! 기본금 {self.base_fund:,}원이 지급됩니다.")
+
+    @commands.command(name="주식랭킹")
+    async def stock_ranking(self, ctx):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT user_id, balance FROM users ORDER BY balance DESC LIMIT 10")
+        rankings = c.fetchall()
+        conn.close()
+
+        if not rankings:
+            await ctx.send("📉 현재 주식 시장에 참여한 유저가 없습니다.")
+            return
+
+        ranking_list = []
+        for i, (user_id, balance) in enumerate(rankings, start=1):
+            user = self.bot.get_user(user_id)
+            username = user.name if user else f"유저 {user_id}"
+            ranking_list.append(f"**{i}등**: {username} - 💰 {balance:,}원")
+
+    @commands.command(name="주식구매")
+    async def buy_stock(self, ctx, stock: str, amount: int):
+        user_id = ctx.author.id
+        stock = stock.upper()
+        if stock not in self.stocks or self.stocks[stock] == 0:
+            await ctx.send("❌ 해당 주식은 존재하지 않거나 상장폐지되었습니다.")
+            return
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
+        result = c.fetchone()
+        if result is None:
+            await ctx.send("❌ 주식 시장에 참여하지 않았습니다. `#주식참가`를 입력하세요.")
+            conn.close()
+            return
+        balance = result[0]
+        total_price = self.stocks[stock] * amount
+        if balance < total_price:
+            await ctx.send("❌ 잔고가 부족합니다.")
+            conn.close()
+            return
+        c.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (total_price, user_id))
+        c.execute("INSERT INTO portfolio (user_id, stock, shares) VALUES (?, ?, ?) ON CONFLICT(user_id, stock) DO UPDATE SET shares = shares + ?",
+                  (user_id, stock, amount, amount))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"✅ {ctx.author.mention}님이 {stock} {amount}주를 구매하였습니다.")
+
+    @commands.command(name="주식판매")
+    async def sell_stock(self, ctx, stock: str, amount: int):
+        user_id = ctx.author.id
+        stock = stock.upper()
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT shares FROM portfolio WHERE user_id = ? AND stock = ?", (user_id, stock))
+        result = c.fetchone()
+        if result is None or result[0] < amount:
+            await ctx.send("❌ 보유 주식이 부족합니다.")
+            conn.close()
+            return
+        total_price = self.stocks[stock] * amount
+        c.execute("UPDATE portfolio SET shares = shares - ? WHERE user_id = ? AND stock = ?", (amount, user_id, stock))
+        c.execute("DELETE FROM portfolio WHERE user_id = ? AND stock = ? AND shares = 0", (user_id, stock))
+        c.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (total_price, user_id))
+        conn.commit()
+        conn.close()
+        await ctx.send(f"✅ {ctx.author.mention}님이 {stock} {amount}주를 판매하였습니다.")
+    
+
+        embed = discord.Embed(title="🏆 주식 랭킹 (보유 자산 TOP 10)", description="\n".join(ranking_list), color=discord.Color.gold())
+        await ctx.send(embed=embed)
+
+    @commands.command(name="다음갱신")
+    async def next_update(self, ctx):
+        now = datetime.now(self.kst)
+        next_update_minute = (now.minute // 20 + 1) * 20 % 60
+        next_update_time = now.replace(minute=next_update_minute, second=0)
+        if next_update_minute == 0:
+            next_update_time += timedelta(hours=1)
+        remaining_time = next_update_time - now
+        await ctx.send(f"⏳ 다음 주식 변동까지 {remaining_time.seconds // 60}분 남았습니다. 갱신 시간: {next_update_time.strftime('%H:%M')} KST")
+
+    @commands.command(name="시즌")
+    async def season_info(self, ctx):
+        now = datetime.now(self.kst)
+        season_end = datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=self.kst)
+        if now >= season_end:
+            season_end = datetime(now.year, now.month + 1, 1, 0, 0, 0, tzinfo=self.kst)
+        remaining_time = season_end - now
+        await ctx.send(f"📅 현재 시즌 종료까지 {remaining_time.days}일 {remaining_time.seconds // 3600}시간 남았습니다. 종료 시간: {season_end.strftime('%Y-%m-%d %H:%M')} KST")
+
+
+
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

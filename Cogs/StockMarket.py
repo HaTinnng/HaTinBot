@@ -12,7 +12,7 @@ DATA_FILE = "stock_data.json"  # JSON 저장 파일명
 def init_stocks():
     """
     11개의 주식을 아래와 같이 초기화합니다.
-      - "311유통": 10 ~ 100
+      - "311유통": 100
       - "썬더타이어", "룡치수산": 100 ~ 1000
       - "맥턴맥주", "섹보경컬쳐": 1000 ~ 5000
       - "전차수리점", "디코커피": 5000 ~ 20000
@@ -21,7 +21,7 @@ def init_stocks():
       - "하틴출판사": 75000 ~ 100000
     """
     stocks = {}
-    stocks["1"] = {"name": "311유통", "price": random.randint(10, 100), "last_change": 0, "percent_change": 0}
+    stocks["1"] = {"name": "311유통", "price": random.randint(99, 100), "last_change": 0, "percent_change": 0}
     stocks["2"] = {"name": "썬더타이어", "price": random.randint(100, 1000), "last_change": 0, "percent_change": 0}
     stocks["3"] = {"name": "룡치수산", "price": random.randint(100, 1000), "last_change": 0, "percent_change": 0}
     stocks["4"] = {"name": "맥턴맥주", "price": random.randint(1000, 5000), "last_change": 0, "percent_change": 0}

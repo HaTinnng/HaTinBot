@@ -3,15 +3,11 @@ from discord.ext import commands, tasks
 import random, json, os
 from datetime import datetime, timedelta
 import pytz
-from google.cloud import storage  # pip install google-cloud-storage
-
-# 구글 클라우드 스토리지 설정
-BUCKET_NAME = "discord-data-bucket"   # 본인의 버킷 이름으로 수정
-FILE_NAME = "stock_data.json"       # 저장할 파일 이름
 
 # 상수 설정
 JOIN_BONUS = 500000        # #주식참가 시 지급 자금
-DEFAULT_MONEY = 500000     # 시즌 초기화 후 유저 기본 잔액
+DEFAULT_MONEY = 100000     # 시즌 초기화 후 유저 기본 잔액
+DATA_FILE = "stock_data.json"  # JSON 저장 파일명
 
 def init_stocks():
     """
@@ -38,29 +34,20 @@ def init_stocks():
     stocks["11"] = {"name": "하틴출판사", "price": random.randint(75000, 100000), "last_change": 0, "percent_change": 0}
     return stocks
 
-def get_gcs_client():
-    """구글 클라우드 스토리지 클라이언트 생성"""
-    return storage.Client()
-
 def load_data():
     """
-    구글 클라우드 스토리지에서 JSON 데이터를 불러옵니다.
-    파일이 없거나 문제가 있을 경우 새 데이터를 생성합니다.
+    JSON 파일을 로드합니다.
+    파일이 없거나 'stocks' 항목이 없으면 새 데이터를 생성합니다.
     """
-    client = get_gcs_client()
-    bucket = client.bucket(BUCKET_NAME)
-    blob = bucket.blob(FILE_NAME)
     data = None
-    try:
-        if blob.exists():
-            data_str = blob.download_as_string().decode("utf-8")
-            data = json.loads(data_str)
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
             if "stocks" not in data or not data["stocks"]:
                 data["stocks"] = init_stocks()
-        else:
-            print("GCS에 파일이 존재하지 않습니다. 새 데이터를 생성합니다.")
-    except Exception as e:
-        print("GCS 데이터 로드 중 오류 발생:", e)
+        except Exception as e:
+            print("JSON 파일 로드 중 오류 발생:", e)
     if data is None:
         data = {
             "stocks": init_stocks(),
@@ -71,20 +58,18 @@ def load_data():
                 "last_reset": None
             }
         }
-    save_data(data)  # 새 데이터로 GCS 업데이트
+    save_data(data)
     return data
 
 def save_data(data):
-    """구글 클라우드 스토리지에 JSON 데이터를 저장합니다."""
-    client = get_gcs_client()
-    bucket = client.bucket(BUCKET_NAME)
-    blob = bucket.blob(FILE_NAME)
-    blob.upload_from_string(json.dumps(data, ensure_ascii=False, indent=4), content_type="application/json")
+    """데이터를 JSON 파일에 저장합니다."""
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 class StockMarket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.data = load_data()  # GCS에서 데이터 로드
+        self.data = load_data()
         self.last_update_min = None  # 같은 분 내 중복 업데이트 방지
         self.stock_update_loop.start()
         self.season_reset_loop.start()
@@ -127,6 +112,7 @@ class StockMarket(commands.Cog):
             if self.last_update_min != now.minute:
                 self.update_stocks()
                 self.last_update_min = now.minute
+                # 필요 시 채널에 업데이트 알림 전송 가능
 
     @tasks.loop(minutes=1)
     async def season_reset_loop(self):
@@ -157,6 +143,7 @@ class StockMarket(commands.Cog):
             user = self.data["users"].setdefault(user_id, {"money": DEFAULT_MONEY, "portfolio": {}, "titles": []})
             if title not in user["titles"]:
                 user["titles"].append(title)
+        # 모든 유저의 잔액과 포트폴리오 초기화 (칭호는 유지)
         for user in self.data["users"].values():
             user["money"] = DEFAULT_MONEY
             user["portfolio"] = {}
@@ -164,6 +151,7 @@ class StockMarket(commands.Cog):
         self.data["season"]["season_no"] += 1
         self.data["season"]["last_reset"] = now.strftime("%Y-%m-%d %H:%M:%S")
         save_data(self.data)
+        # 필요 시 시즌 종료 알림 전송 가능
 
     def get_next_update_info(self):
         """다음 주식 변동 시각과 남은 시간을 계산하여 반환합니다."""

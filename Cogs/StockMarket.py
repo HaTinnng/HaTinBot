@@ -15,25 +15,8 @@ class StockMarket(commands.Cog):
         self.update_stocks.start()
         self.reset_season.start()
 
-        # 주식 초기 가격 설정
-        self.stocks = {
-            "PENNY": random.randint(10, 100),
-            "AAPL": random.randint(100, 500),
-            "TSLA": random.randint(100, 500),
-            "GOOGL": random.randint(100, 500),
-            "AMZN": random.randint(500, 2000),
-            "MSFT": random.randint(500, 2000),
-            "NVDA": random.randint(500, 2000),
-            "FB": random.randint(2000, 10000),
-            "DIS": random.randint(2000, 10000),
-            "NFLX": random.randint(2000, 10000),
-            "BRK.A": random.randint(10000, 50000),
-            "GOOG": random.randint(10000, 50000),
-            "TSMC": random.randint(10000, 50000),
-            "VISA": random.randint(10000, 50000),
-        }
-
         self.initialize_database()
+        self.load_stocks()
 
     def initialize_database(self):
         conn = sqlite3.connect(self.db_path)
@@ -60,6 +43,49 @@ class StockMarket(commands.Cog):
                 PRIMARY KEY (user_id, title)
             )
         """)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS stocks (
+                stock TEXT PRIMARY KEY,
+                price INTEGER
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    def load_stocks(self):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("SELECT stock, price FROM stocks")
+        data = c.fetchall()
+        if data:
+            self.stocks = {stock: price for stock, price in data}
+        else:
+            self.stocks = {
+                "PENNY": random.randint(10, 100),
+                "AAPL": random.randint(100, 500),
+                "TSLA": random.randint(100, 500),
+                "GOOGL": random.randint(100, 500),
+                "AMZN": random.randint(500, 2000),
+                "MSFT": random.randint(500, 2000),
+                "NVDA": random.randint(500, 2000),
+                "FB": random.randint(2000, 10000),
+                "DIS": random.randint(2000, 10000),
+                "NFLX": random.randint(2000, 10000),
+                "BRK.A": random.randint(10000, 50000),
+                "GOOG": random.randint(10000, 50000),
+                "TSMC": random.randint(10000, 50000),
+                "VISA": random.randint(10000, 50000),
+            }
+            for stock, price in self.stocks.items():
+                c.execute("INSERT INTO stocks (stock, price) VALUES (?, ?)", (stock, price))
+            conn.commit()
+        conn.close()
+
+    def save_stocks(self):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        for stock, price in self.stocks.items():
+            c.execute("UPDATE stocks SET price = ? WHERE stock = ?", (price, stock))
         conn.commit()
         conn.close()
 
@@ -73,8 +99,8 @@ class StockMarket(commands.Cog):
                     change_percentage = random.uniform(-12.5, 12.5)
                     new_price = int(self.stocks[stock] * (1 + change_percentage / 100))
                     self.stocks[stock] = max(new_price, 0)
+            self.save_stocks()
             
-    @tasks.loop(hours=1)
     async def reset_season(self):
         now = datetime.now(self.kst)
         if now.day == 1 and now.hour == 0:

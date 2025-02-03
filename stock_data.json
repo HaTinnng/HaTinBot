@@ -67,17 +67,7 @@
       "percent_change": 0
     }
   },
-  "users": {
-    "": {
-      "money": ,
-      "portfolio": {
-        "1": 10,
-        "3": 5
-      },
-      "titles": [
-      ]
-    }
-  },
+  "users": {},
   "season": {
     "year": 2025,
     "season_no": 2,

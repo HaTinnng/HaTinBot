@@ -121,11 +121,20 @@ class StockMarket(commands.Cog):
         c.execute("SELECT title FROM titles WHERE user_id = ?", (user_id,))
         titles = [row[0] for row in c.fetchall()]
         conn.close()
-        desc = f"💰 보유 자금: {balance:,}원\n📈 보유 주식:\n" + "\n".join([f"{s}: {sh}주" for s, sh in portfolio])
-        desc += f"\n🏆 보유 칭호:\n" + "\n".join(titles) if titles else "없음"
+        desc = f"💰 보유 자금: {balance:,}원\n📈 보유 주식:\n"
+        if portfolio:
+            desc += "\n".join([f"{stock}: {shares}주" for stock, shares in portfolio])
+        else:
+            desc += "없음"
+        desc += "\n🏆 보유 칭호:\n"
+        if titles:
+            desc += "\n".join(titles)
+        else:
+            desc += "없음"
         embed = discord.Embed(title=f"{ctx.author.display_name}님의 프로필", description=desc, color=discord.Color.green())
         await ctx.send(embed=embed)
 
+    
     @commands.command(name="주식랭킹")
     async def stock_ranking(self, ctx):
         conn = sqlite3.connect(self.db_path)

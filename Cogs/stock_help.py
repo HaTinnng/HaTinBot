@@ -16,7 +16,7 @@ class StockHelp(commands.Cog):
             color=discord.Color.blue()
         )
 
-         embed.add_field(name="❓ **주식은**", value=(
+        embed.add_field(name="❓ **주식은**", value=(
             "주식은 자신이 보유한 돈을 가지고 주식을 구매하고 판매합니다!\n"
             "주식은 매시 0분 20분 40분에 갱신이 됩니다.\n"
             "시즌은 다음달 1월 0시 10일에 시즌 종료가 되고 TOP3에게는 칭호가 주어집니다! 칭호는 영원히 유지가 됩니다.\n"

@@ -723,5 +723,41 @@ class StockMarket(commands.Cog):
             lines.append(f"{price}원 {arrow}")
         await ctx.send("\n".join(lines))
 
+    @commands.command(name="주식완전초기화")
+    @commands.is_owner()
+    async def reset_full_game(self, ctx):
+        """
+        #주식완전초기화 (봇 소유자 전용):
+        - **모든 유저 데이터 삭제 (users 컬렉션 완전 삭제)**
+        - **모든 주식 데이터 초기화**
+        - **시즌 정보는 유지됨**
+        - **기존 참가 유저들은 모두 사라지므로 다시 #주식참가를 해야 함**
+        """
+        confirmation_message = await ctx.send("⚠️ **경고: 주식 게임을 완전히 초기화합니다.** ⚠️\n"
+                                              "모든 유저 데이터가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.\n"
+                                              "이 작업을 진행하려면 `확인`이라고 입력하세요.")
+
+        def check(m):
+            return m.author == ctx.author and m.content == "확인"
+
+        try:
+            await self.bot.wait_for("message", check=check, timeout=20)
+        except TimeoutError:
+            await ctx.send("⏳ 초기화가 취소되었습니다.")
+            return
+
+        # 모든 유저 데이터 삭제
+        self.db.users.delete_many({})
+        
+        # 모든 주식 데이터 초기화
+        self.db.stocks.delete_many({})
+        stocks = init_stocks()
+        for stock in stocks.values():
+            self.db.stocks.insert_one(stock)
+
+        await ctx.send("✅ **주식 게임이 완전히 초기화되었습니다.**\n"
+                       "모든 유저 데이터가 삭제되었으며, 참가하려면 `#주식참가`를 다시 입력해야 합니다.")
+
+
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

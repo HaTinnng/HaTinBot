@@ -1,4 +1,3 @@
-import os
 import discord
 from discord.ext import commands, tasks
 import random
@@ -9,14 +8,13 @@ from pymongo import MongoClient
 # ===== 상수 설정 =====
 JOIN_BONUS = 800000         # 참가 시 지급 자금 (800,000원)
 DEFAULT_MONEY = 800000      # 시즌 초기화 후 유저 기본 잔액 (800,000원)
-# MongoDB URI는 클라우드에서 비밀변수 MONGODB_URI를 통해 불러옵니다.
-MONGO_URI = os.environ.get("MONGODB_URI")
+MONGO_URI = "mongodb://localhost:27017"  # (실제 배포시 환경변수 등을 활용할 수 있습니다.)
 DB_NAME = "stock_game"
 
 # ===== DB에 저장할 주식 초기화 함수 =====
 def init_stocks():
     """
-    17개의 주식을 아래와 같이 초기화합니다.
+    16개의 주식을 아래와 같이 초기화합니다.
       - "311유통": 100
       - "썬더타이어": 500 ~ 1000
       - "룡치수산": 3000 ~ 5000
@@ -30,13 +28,13 @@ def init_stocks():
       - "하틴봇전자": 170000 ~ 210000
       - "하틴출판사": 240000 ~ 270000
       - "창훈버거": 300000 ~ 330000
-      - "끼룩제약": 375000 (약간의 오차 허용)
+      - "끼룩제약": 375000
       - "날틀식품": 420000 ~ 450000
       - "오십만통신": 500000
 
-    각 종목은 추가적으로 아래 필드를 가집니다.
+    각 종목은 아래 필드를 가집니다.
       - last_change, percent_change: 최근 가격 변동 내역
-      - listed: 상장 여부 (이제 가격 변동폭에 따라 조정되므로 별도 상장폐지 처리는 하지 않습니다)
+      - listed: 상장 여부 (여기서는 가격 변동폭에 따라 조정)
       - history: 최근 5회 가격 기록 (최초값 포함)
     """
     stocks = {}
@@ -138,7 +136,7 @@ def init_stocks():
         "percent_change": 0,
         "listed": True,
         "history": []
-    }    
+    }
     stocks["12"] = {
         "_id": "12",
         "name": "하틴출판사",
@@ -174,7 +172,7 @@ def init_stocks():
         "percent_change": 0,
         "listed": True,
         "history": []
-    } 
+    }
     stocks["16"] = {
         "_id": "16",
         "name": "오십만통신",
@@ -183,7 +181,7 @@ def init_stocks():
         "percent_change": 0,
         "listed": True,
         "history": []
-    }    
+    }
     # 각 종목의 history에 최초 가격 추가
     for s in stocks.values():
         s["history"].append(s["price"])
@@ -193,7 +191,7 @@ def init_stocks():
 class StockMarket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # MongoDB 연결 (환경변수 MONGODB_URI 사용)
+        # MongoDB 연결
         self.mongo_client = MongoClient(MONGO_URI)
         self.db = self.mongo_client[DB_NAME]
 
@@ -214,6 +212,8 @@ class StockMarket(commands.Cog):
                 self.db.stocks.insert_one(stock)
 
         # users 컬렉션은 사용자가 가입할 때 생성됨
+        # 이전 #주식 목록 순서를 저장 (stock _id -> index)
+        self.prev_stock_order = {}
 
         self.last_update_min = None  # 업데이트한 분 기억
         self.last_reset_month = None  # (year, month) 기준으로 시즌 리셋 여부 체크
@@ -270,36 +270,36 @@ class StockMarket(commands.Cog):
 
     def update_stocks(self):
         """
-        거래 가능 시간에 주식 가격을 현재 가격의 변동폭 제한 내에서 변동합니다.
-        - 기본 변동폭 제한: ±23.78%
-        - 단, 주식가가 50원 미만이면 변동폭 제한을 ±100%로 확대합니다.
+        거래 가능 시간에 주식 가격을 현재 가격의 최대 ±23.78% 범위 내에서 변동합니다.
         단, 이미 상장폐지( listed==False )된 종목은 업데이트하지 않습니다.
+        만약 변동 후 가격이 50원 이하라면 가격을 50원으로 고정하고,
+        변동 내역( percent_change, last_change )는 0으로 설정한 후 상장폐지 처리합니다.
         또한 각 종목의 history 필드에 최근 5회 가격을 기록합니다.
         """
+        # 거래가 중단되어 있으면 업데이트하지 않음
         if not self.is_trading_open():
             return
 
         cursor = self.db.stocks.find({})
         for stock in cursor:
             if not stock.get("listed", True):
-                continue  # 상장폐지된 종목은 업데이트하지 않음 (현재는 listed 필드 변경 없이 그대로 유지)
+                continue  # 상장폐지된 종목은 업데이트하지 않음
 
             old_price = stock["price"]
-            # 만약 현재 주식 가격이 50원 미만이면 변동폭 제한을 ±100%로 확대
-            if old_price < 50:
-                limit = 100.0
-            else:
-                limit = 23.78
-
-            percent_change = random.uniform(-limit, limit)
+            percent_change = random.uniform(-23.78, 23.78)
             new_price = int(old_price * (1 + percent_change / 100))
-            new_price = max(new_price, 1)  # 최소 1원 이상
 
-            update_fields = {
-                "last_change": new_price - old_price,
-                "percent_change": round(percent_change, 2),
-                "price": new_price,
-            }
+            update_fields = {}
+            if new_price <= 50:
+                new_price = 50
+                update_fields["last_change"] = 0
+                update_fields["percent_change"] = 0
+                update_fields["listed"] = False  # 상장폐지 처리
+            else:
+                update_fields["last_change"] = new_price - old_price
+                update_fields["percent_change"] = round(percent_change, 2)
+            update_fields["price"] = new_price
+
             # history 업데이트 (최근 5회 기록)
             history = stock.get("history", [])
             history.append(new_price)
@@ -307,13 +307,12 @@ class StockMarket(commands.Cog):
             update_fields["history"] = history
 
             self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": update_fields})
-
+    
     @tasks.loop(seconds=10)
     async def stock_update_loop(self):
         """
-        매 10초마다 현재 시간이 분이 0, 20, 40분일 때 주식 가격을 업데이트합니다.
+        매 10초마다 현재 시간이 0, 20, 40분일 때 주식 가격을 업데이트합니다.
         단, 같은 분 내 중복 업데이트는 방지합니다.
-        거래가 중단된 시간에는 업데이트하지 않습니다.
         """
         now = self.get_seoul_time()
         if not self.is_trading_open():
@@ -327,8 +326,8 @@ class StockMarket(commands.Cog):
     async def season_reset_loop(self):
         """
         매 분마다 현재 시간을 확인하여, 매월 1일 00:10에 시즌 종료 및 초기화 처리를 진행합니다.
-        시즌 종료 시 모든 유저의 자산을 산출하여 상위 3명에게 칭호를 부여한 후,
-        모든 유저의 잔액과 포트폴리오를 초기화(기본금은 800,000원)하고 주식 데이터를 새로 초기화합니다.
+        시즌 종료 시 상위 3명에게 칭호를 부여한 후,
+        모든 유저의 잔액과 포트폴리오(구매가 정보)는 초기화(기본금은 800,000원)하고 주식 데이터를 새로 초기화합니다.
         """
         now = self.get_seoul_time()
         if now.day == 1 and now.hour == 0 and now.minute == 10:
@@ -343,14 +342,13 @@ class StockMarket(commands.Cog):
         """
         current_status = self.is_trading_open()
         if current_status and not self._last_trading_status:
-            self.last_update_min = None  # 업데이트 분 초기화
+            self.last_update_min = None
         self._last_trading_status = current_status
 
     async def process_season_end(self, now):
         """
-        시즌 종료 시 모든 유저의 자산(현금 + 보유 주식 평가액)을 산출하여 상위 3명에게
-        칭호("YYYY 시즌N TOP{순위}")를 부여하고, 모든 유저의 잔액과 포트폴리오(구매가 정보 포함)를 초기화합니다.
-        주식 데이터는 새로 초기화됩니다.
+        시즌 종료 시 각 유저의 자산(현금 + 보유 주식 평가액)을 계산하여 상위 3명에게 칭호를 부여하고,
+        모든 유저의 잔액과 포트폴리오는 초기화(칭호는 유지)하고 주식 데이터를 새로 초기화합니다.
         """
         ranking = []
         for user in self.db.users.find({}):
@@ -384,36 +382,88 @@ class StockMarket(commands.Cog):
     # ===== 명령어들 =====
 
     @commands.command(name="주식참가", aliases=["주식참여", "주식시작"])
-    async def join_stock(self, ctx):
-        """#주식참가: 처음 참가 시 800,000원을 지급받습니다."""
+    async def join_stock(self, ctx, *, username: str = None):
+        """
+        #주식참가 [이름]:
+        최초 참가 시 반드시 이름을 입력해야 하며, 입력한 이름은 이후 #프로필, #랭킹 등에 표시됩니다.
+        이름이 입력되지 않으면 경고 메시지를 출력합니다.
+        """
+        if not username:
+            await ctx.send("경고: 주식 게임에 참가하려면 반드시 이름을 입력해야 합니다. 예: `#주식참가 홍길동`")
+            return
+
         user_id = str(ctx.author.id)
         if self.db.users.find_one({"_id": user_id}):
             await ctx.send("이미 주식 게임에 참가하셨습니다.")
             return
         user_doc = {
             "_id": user_id,
+            "username": username,
             "money": JOIN_BONUS,
-            "portfolio": {},  # 예: { "1": {"amount": 10, "total_cost": 10000}, ... }
+            "portfolio": {},
             "titles": []
         }
         self.db.users.insert_one(user_doc)
-        await ctx.send(f"{ctx.author.mention}님, 주식 게임에 참가하셨습니다! 초기 자금 {JOIN_BONUS}원을 지급받았습니다.")
+        await ctx.send(f"{ctx.author.mention}님, '{username}' 이름으로 주식 게임에 참가하셨습니다! 초기 자금 {JOIN_BONUS}원을 지급받았습니다.")
 
-    @commands.command(name="주식", aliases=["주식목록", "현재가"])
+    @commands.command(name="주식이름변경")
+    async def change_username(self, ctx, *, new_name: str = None):
+        """
+        #주식이름변경 [새이름]:
+        사용자가 언제든지 자신의 게임 내 이름을 변경할 수 있습니다.
+        """
+        if not new_name:
+            await ctx.send("새 이름을 입력해주세요. 예: `#주식이름변경 홍길동2`")
+            return
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. 먼저 `#주식참가 [이름]`으로 참가해주세요.")
+            return
+        self.db.users.update_one({"_id": user_id}, {"$set": {"username": new_name}})
+        await ctx.send(f"{ctx.author.mention}님의 이름이 '{new_name}'(으)로 변경되었습니다.")
+
+    @commands.command(name="주식초기화")
+    @commands.is_owner()
+    async def reset_game(self, ctx):
+        """
+        #주식초기화 (봇 소유자 전용):
+        칭호를 제외하고 모든 유저의 잔액과 포트폴리오를 초기화하고, 주식 데이터를 새로 생성합니다.
+        """
+        # 모든 유저의 money와 portfolio만 초기화 (칭호, username은 그대로 유지)
+        self.db.users.update_many({}, {"$set": {"money": DEFAULT_MONEY, "portfolio": {}}})
+        self.db.stocks.delete_many({})
+        stocks = init_stocks()
+        for stock in stocks.values():
+            self.db.stocks.insert_one(stock)
+        await ctx.send("주식 게임이 초기화되었습니다. (칭호는 유지됩니다.)")
+
+    @commands.command(name="주식")
     async def show_stocks(self, ctx):
-        """#주식: 전체 주식 목록(종목명, 가격, 변동 내역)을 출력합니다."""
+        """
+        #주식:
+        전체 주식 목록을 **가격 오름차순(낮은 가격 → 높은 가격)** 으로 정렬하여 출력합니다.
+        만약 이전 목록에 비해 순위가 변경되었다면 주식 이름 왼쪽에 🔺(상승) 또는 🔻(하락) 아이콘을 표시합니다.
+        """
+        # stocks 컬렉션에서 가격 오름차순으로 정렬하여 조회
+        stocks_list = list(self.db.stocks.find({}).sort("price", 1))
+        new_order = {}
         msg_lines = []
-        cursor = self.db.stocks.find({}).sort("_id", 1)
-        for stock in cursor:
-            if stock.get("last_change", 0) > 0:
-                arrow = f"🔺{abs(stock['last_change'])}"
-            elif stock.get("last_change", 0) < 0:
-                arrow = f"🔻{abs(stock['last_change'])}"
-            else:
-                arrow = "⏺0"
-            extra = ""  # 상장폐지 처리 대신 변동폭 조절만 하므로 별도 extra 없음
-            line = f"{stock['name']}{extra}: {stock['price']}원 ({arrow}) (변동율: {stock['percent_change']}%)"
+        for idx, stock in enumerate(stocks_list):
+            new_order[stock["_id"]] = idx
+            arrow_change = ""
+            if self.prev_stock_order and stock["_id"] in self.prev_stock_order:
+                old_index = self.prev_stock_order[stock["_id"]]
+                if idx < old_index:
+                    arrow_change = "🔺"
+                elif idx > old_index:
+                    arrow_change = "🔻"
+            # extra는 상장폐지 여부 표시 (여기서는 그대로 사용)
+            extra = " (상장폐지)" if not stock.get("listed", True) else ""
+            line = f"{arrow_change}{stock['name']}{extra}: {stock['price']}원 (변동: {stock['last_change']}원, {stock['percent_change']}%)"
             msg_lines.append(line)
+        # 업데이트 후 새 순서를 저장
+        self.prev_stock_order = new_order
         await ctx.send("\n".join(msg_lines))
 
     @commands.command(name="다음변동", aliases=["변동", "변동시간"])
@@ -425,8 +475,7 @@ class StockMarket(commands.Cog):
     @commands.command(name="주식구매")
     async def buy_stock(self, ctx, stock_name: str, amount: str):
         """
-        #주식구매 [종목명] [수량 또는 all/전부/올인/다/풀매수]
-        예: #주식구매 썬더타이어 10 또는 #주식구매 썬더타이어 올인
+        #주식구매 [종목명] [수량 또는 all/전부/올인/다/풀매수]:
         해당 주식 종목을 지정 수량 또는 전액으로 구매합니다.
         """
         if not self.is_trading_open():
@@ -436,7 +485,7 @@ class StockMarket(commands.Cog):
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
         if not user:
-            await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가 [이름]` 명령어로 먼저 참가해주세요.")
             return
 
         stock = self.db.stocks.find_one({"name": stock_name})
@@ -444,7 +493,7 @@ class StockMarket(commands.Cog):
             await ctx.send("존재하지 않는 주식 종목입니다.")
             return
         if not stock.get("listed", True):
-            await ctx.send("해당 주식은 거래할 수 없습니다.")
+            await ctx.send("해당 주식은 상장폐지되어 거래할 수 없습니다.")
             return
 
         special_buy = ["all", "전부", "올인", "다", "풀매수"]
@@ -486,8 +535,7 @@ class StockMarket(commands.Cog):
     @commands.command(name="주식판매")
     async def sell_stock(self, ctx, stock_name: str, amount: str):
         """
-        #주식판매 [종목명] [수량 또는 all/전부/올인/다/풀매도]
-        예: #주식판매 썬더타이어 5 또는 #주식판매 썬더타이어 all
+        #주식판매 [종목명] [수량 또는 all/전부/올인/다/풀매도]:
         해당 주식 종목을 지정 수량 또는 전량 판매합니다.
         """
         if not self.is_trading_open():
@@ -497,7 +545,7 @@ class StockMarket(commands.Cog):
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
         if not user:
-            await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가 [이름]` 명령어로 먼저 참가해주세요.")
             return
 
         stock = self.db.stocks.find_one({"name": stock_name})
@@ -505,7 +553,7 @@ class StockMarket(commands.Cog):
             await ctx.send("존재하지 않는 주식 종목입니다.")
             return
         if not stock.get("listed", True):
-            await ctx.send("해당 주식은 거래할 수 없습니다.")
+            await ctx.send("해당 주식은 상장폐지되어 거래할 수 없습니다.")
             return
 
         portfolio = user.get("portfolio", {})
@@ -550,18 +598,20 @@ class StockMarket(commands.Cog):
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
         await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount}주 판매하여 {revenue}원을 획득하였습니다.")
 
-    @commands.command(name="프로필", aliases=["보관함", "자산", "자본"])
+    @commands.command(name="프로필", aliases=["보관함"])
     async def profile(self, ctx):
         """
-        #프로필: 자신의 현금, 각 종목별 보유 주식 수량, 해당 종목의 현재 평가액과
-        평균 구매가(구매가 정보)를 포함한 전체 자산을 보여줍니다.
+        #프로필:
+        자신의 현금, 각 종목별 보유 주식 수량, 현재 평가액 및 평균 구매가(구매가 정보)를 포함한 전체 자산을 보여줍니다.
+        게임 참가 시 입력한 이름이 표시됩니다.
         """
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
         if not user:
-            await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. 먼저 `#주식참가 [이름]`으로 참가해주세요.")
             return
 
+        username = user.get("username", ctx.author.display_name)
         portfolio = user.get("portfolio", {})
         total_stock_value = 0
         portfolio_lines = []
@@ -581,7 +631,7 @@ class StockMarket(commands.Cog):
         total_assets = user.get("money", DEFAULT_MONEY) + total_stock_value
         titles_str = ", ".join(user.get("titles", [])) if user.get("titles", []) else "없음"
         msg = (
-            f"**{ctx.author.display_name}님의 프로필**\n"
+            f"**{username}님의 프로필**\n"
             f"현금 잔액: {user['money']}원\n"
             f"보유 주식 총액: {total_stock_value}원\n"
             f"전체 자산 (현금 + 주식): {total_assets}원\n\n"
@@ -593,8 +643,8 @@ class StockMarket(commands.Cog):
     @commands.command(name="랭킹")
     async def ranking(self, ctx):
         """
-        #랭킹: 전체 유저의 자산(현금+보유 주식 평가액)을 기준으로 상위 10명을
-        (유저 id와 유저 이름 포함) 출력합니다.
+        #랭킹:
+        전체 유저의 자산(현금+보유 주식 평가액)을 기준으로 상위 10명을 (유저 id와 게임 내 이름 포함) 출력합니다.
         """
         ranking_list = []
         for user in self.db.users.find({}):
@@ -604,20 +654,18 @@ class StockMarket(commands.Cog):
                 stock = self.db.stocks.find_one({"_id": sid})
                 if stock:
                     total += stock["price"] * holding.get("amount", 0)
-            ranking_list.append((user["_id"], total))
+            ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         msg_lines = ["**랭킹 TOP 10**"]
-        for idx, (uid, total) in enumerate(ranking_list[:10], start=1):
-            user_obj = self.bot.get_user(int(uid))
-            name = user_obj.display_name if user_obj else "알 수 없음"
-            msg_lines.append(f"{idx}. {name} (ID: {uid}) - {total}원")
+        for idx, (uid, total, uname) in enumerate(ranking_list[:10], start=1):
+            msg_lines.append(f"{idx}. {uname} (ID: {uid}) - {total}원")
         await ctx.send("\n".join(msg_lines))
-    
+
     @commands.command(name="시즌")
     async def season_info(self, ctx):
         """
-        #시즌: 현재 시즌명과 시즌 종료 시각(다음 달 1일 00:10:00, 한국시간 기준),
-        남은 시간을 보여줍니다.
+        #시즌:
+        현재 시즌명과 시즌 종료 시각(다음 달 1일 00:10:00, 한국시간 기준), 남은 시간을 보여줍니다.
         """
         season = self.db.season.find_one({"_id": "season"})
         season_name = f"{season['year']} 시즌{season['season_no']}"
@@ -632,8 +680,8 @@ class StockMarket(commands.Cog):
         season_end = tz.localize(datetime(year=next_year, month=next_month, day=1, hour=0, minute=10, second=0))
         remaining = season_end - now
         days = remaining.days
-        hours, remainder = divmod(remaining.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
+        hours, rem = divmod(remaining.seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
         remaining_str = f"{days}일 {hours}시간 {minutes}분 {seconds}초"
     
         await ctx.send(
@@ -646,8 +694,7 @@ class StockMarket(commands.Cog):
     async def price_history(self, ctx, stock_name: str):
         """
         #변동내역 [주식명]:
-        해당 주식의 최근 5회 가격 기록과 각 기록이 바로 이전 대비 상승(🔺),
-        하락(🔻), 동일(⏺)했는지를 표시하여 출력합니다.
+        해당 주식의 최근 5회 가격 기록과, 바로 이전 기록과 비교하여 상승(🔺), 하락(🔻), 동일(⏺) 여부를 표시합니다.
         """
         stock = self.db.stocks.find_one({"name": stock_name})
         if not stock:

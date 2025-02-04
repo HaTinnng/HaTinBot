@@ -9,6 +9,7 @@ from pymongo import MongoClient
 # ===== 상수 설정 =====
 JOIN_BONUS = 800000         # 참가 시 지급 자금 (800,000원)
 DEFAULT_MONEY = 800000      # 시즌 초기화 후 유저 기본 잔액 (800,000원)
+SUPPORT_AMOUNT = 50000  # 지원금 5만원
 # MongoDB URI는 클라우드에서 비밀변수 MONGODB_URI를 통해 불러옵니다.
 MONGO_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "stock_game"
@@ -757,6 +758,38 @@ class StockMarket(commands.Cog):
 
         await ctx.send("✅ **주식 게임이 완전히 초기화되었습니다.**\n"
                        "모든 유저 데이터가 삭제되었으며, 참가하려면 `#주식참가`를 다시 입력해야 합니다.")
+
+
+    @commands.command(name="주식지원금", aliases=["지원금"])
+    async def stock_support(self, ctx):
+        """
+        #주식지원금: 하루에 한 번 50,000원의 지원금을 받을 수 있습니다.
+        (한국 시간 00:00에 초기화)
+        """
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가` 명령어로 참가해주세요.")
+            return
+
+        now = self.get_seoul_time()
+        last_support_str = user.get("last_support", None)
+
+        if last_support_str:
+            last_support = datetime.strptime(last_support_str, "%Y-%m-%d")
+            if last_support.date() == now.date():
+                await ctx.send(f"{ctx.author.mention}님, 오늘의 지원금을 이미 받았습니다! 내일 다시 시도해주세요.")
+                return
+
+        # 지원금 지급
+        new_money = user.get("money", 0) + SUPPORT_AMOUNT
+        self.db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"money": new_money, "last_support": now.strftime("%Y-%m-%d")}}
+        )
+
+        await ctx.send(f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원")  
 
 
 async def setup(bot):

@@ -8,4 +8,4 @@ discord
 PyNaCl
 ffmpeg
 FFMPEG
-google-cloud-storage
+pymongo

@@ -18,6 +18,16 @@ if not MONGODB_URI:
 mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URI)
 db = mongo_client["discordbot"]  # 사용할 데이터베이스 이름 (원하는 이름으로 변경 가능)
 
+async def check_mongodb_connection():
+    """MongoDB 서버 연결 상태를 확인하고 연결되었으면 메시지 출력"""
+    try:
+        # 서버 정보를 요청하여 연결 확인 (연결이 안 되어있으면 예외 발생)
+        await mongo_client.server_info()
+        print("✅ MongoDB에 성공적으로 연결되었습니다.")
+    except Exception as e:
+        print("❌ MongoDB 연결 실패:", e)
+        exit(1)
+
 async def load_disabled_cogs():
     """MongoDB에서 비활성화된 Cog 목록을 불러옵니다."""
     config = await db.config.find_one({"_id": "disabled_cogs"})
@@ -151,6 +161,7 @@ async def on_command_error(ctx, error):
         raise error  # 다른 오류는 그대로 출력
 
 async def main():
+    await check_mongodb_connection()  # MongoDB 연결 확인
     await load_extensions()
     bot_token = os.getenv("DISCORD_TOKEN")
     if not bot_token:
@@ -160,4 +171,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

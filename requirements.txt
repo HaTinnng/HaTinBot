@@ -9,4 +9,4 @@ PyNaCl
 ffmpeg
 FFMPEG
 pymongo
-moter
+motor

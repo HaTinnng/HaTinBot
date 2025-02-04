@@ -602,7 +602,7 @@ class StockMarket(commands.Cog):
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
         await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount}주 판매하여 {revenue}원을 획득하였습니다.")
 
-    @commands.command(name="프로필", aliases=["보관함"])
+    @commands.command(name="프로필", aliases=["보관함", "자산", "자본"])
     async def profile(self, ctx):
         """
         #프로필:

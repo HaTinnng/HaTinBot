@@ -469,7 +469,7 @@ class StockMarket(commands.Cog):
         self.prev_stock_order = new_order
         await ctx.send("\n".join(msg_lines))
 
-    @commands.command(name="다음변동", aliases=["변동", "변동시간"])
+    @commands.command(name="다음변동", aliases=["변동", "변동시간","갱신","다음갱신"])
     async def next_update(self, ctx):
         """#다음변동: 다음 주식 변동 시각과 남은 시간을 안내합니다."""
         next_time, delta = self.get_next_update_info()

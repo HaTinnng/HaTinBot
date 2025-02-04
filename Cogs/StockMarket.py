@@ -475,7 +475,7 @@ class StockMarket(commands.Cog):
         next_time, delta = self.get_next_update_info()
         await ctx.send(f"다음 변동 시각: {next_time.strftime('%H:%M:%S')} (남은 시간: {str(delta).split('.')[0]})")
 
-    @commands.command(name="주식구매")
+    @commands.command(name="주식구매",aliases=["매수"])
     async def buy_stock(self, ctx, stock_name: str, amount: str):
         """
         #주식구매 [종목명] [수량 또는 all/전부/올인/다/풀매수]:
@@ -535,7 +535,7 @@ class StockMarket(commands.Cog):
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
         await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {buy_amount}주 구매하였습니다. (총 {total_cost}원)")
 
-    @commands.command(name="주식판매")
+    @commands.command(name="주식판매",aliases=["매도"])
     async def sell_stock(self, ctx, stock_name: str, amount: str):
         """
         #주식판매 [종목명] [수량 또는 all/전부/올인/다/풀매도]:

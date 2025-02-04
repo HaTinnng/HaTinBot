@@ -643,7 +643,7 @@ class StockMarket(commands.Cog):
         )
         await ctx.send(msg)
 
-    @commands.command(name="랭킹")
+    @commands.command(name="랭킹", aliases=["순위"])
     async def ranking(self, ctx):
         """
         #랭킹:

@@ -3,30 +3,39 @@ import os
 import discord
 from discord.ext import commands
 import asyncio
+import motor.motor_asyncio  # 비동기 MongoDB 드라이버 motor
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="#", intents=intents)
 
-DISABLED_COGS_FILE = "Cogs/disabled_cogs.txt"
+# MongoDB 연결 설정
+MONGODB_URI = os.getenv("MONGODB_URI")
+if not MONGODB_URI:
+    print("❌ MongoDB URI가 설정되지 않았습니다. 환경변수 MONGODB_URI를 설정해주세요.")
+    exit(1)
+mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URI)
+db = mongo_client["discordbot"]  # 사용할 데이터베이스 이름 (원하는 이름으로 변경 가능)
 
-def load_disabled_cogs():
-    """비활성화된 파일 목록을 불러오기"""
-    try:
-        with open(DISABLED_COGS_FILE, "r", encoding="utf-8") as f:
-            return [line.strip() for line in f.readlines() if line.strip()]
-    except FileNotFoundError:
-        return []
+async def load_disabled_cogs():
+    """MongoDB에서 비활성화된 Cog 목록을 불러옵니다."""
+    config = await db.config.find_one({"_id": "disabled_cogs"})
+    if config and "cogs" in config:
+        return config["cogs"]
+    return []
 
-def save_disabled_cogs(disabled_cogs):
-    """비활성화된 파일 목록을 저장"""
-    with open(DISABLED_COGS_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(disabled_cogs))
+async def save_disabled_cogs(disabled_cogs):
+    """MongoDB에 비활성화된 Cog 목록을 저장합니다."""
+    await db.config.update_one(
+        {"_id": "disabled_cogs"},
+        {"$set": {"cogs": disabled_cogs}},
+        upsert=True
+    )
 
 async def load_extensions():
-    """Cogs 폴더 내의 모든 확장을 로드 (비활성화된 파일 제외)"""
-    disabled_cogs = load_disabled_cogs()
+    """Cogs 폴더 내의 모든 확장을 로드합니다 (MongoDB에 기록된 비활성화된 Cog는 제외)."""
+    disabled_cogs = await load_disabled_cogs()
     
     for filename in os.listdir("Cogs"):
         if filename.endswith(".py") and filename != "__init__.py":
@@ -45,12 +54,12 @@ async def load_extensions():
 @bot.command(name="비활성화")
 @commands.is_owner()
 async def disable_cog(ctx, cog_name: str):
-    """특정 Cog 파일을 즉시 비활성화 (봇 소유자만 가능)"""
-    disabled_cogs = load_disabled_cogs()
+    """특정 Cog 파일을 즉시 비활성화합니다 (봇 소유자 전용)."""
+    disabled_cogs = await load_disabled_cogs()
 
     if cog_name not in disabled_cogs:
         disabled_cogs.append(cog_name)
-        save_disabled_cogs(disabled_cogs)
+        await save_disabled_cogs(disabled_cogs)
 
         try:
             await bot.unload_extension(f"Cogs.{cog_name}")
@@ -63,12 +72,12 @@ async def disable_cog(ctx, cog_name: str):
 @bot.command(name="활성화")
 @commands.is_owner()
 async def enable_cog(ctx, cog_name: str):
-    """특정 Cog 파일을 즉시 활성화 (봇 소유자만 가능)"""
-    disabled_cogs = load_disabled_cogs()
+    """특정 Cog 파일을 즉시 활성화합니다 (봇 소유자 전용)."""
+    disabled_cogs = await load_disabled_cogs()
 
     if cog_name in disabled_cogs:
         disabled_cogs.remove(cog_name)
-        save_disabled_cogs(disabled_cogs)
+        await save_disabled_cogs(disabled_cogs)
 
         try:
             await bot.load_extension(f"Cogs.{cog_name}")
@@ -88,9 +97,9 @@ async def reload_cogs(ctx, cog_name: str = None):
             if filename.endswith(".py") and filename != "__init__.py":
                 cog_path = f"Cogs.{filename[:-3]}"
                 try:
-                    if cog_path in bot.extensions:  # ✅ 이미 로드된 경우만 언로드 후 로드
+                    if cog_path in bot.extensions:  # 이미 로드된 경우 언로드 후 로드
                         await bot.unload_extension(cog_path)
-                    await bot.load_extension(cog_path)  # ✅ 다시 로드
+                    await bot.load_extension(cog_path)  # 다시 로드
                     await ctx.send(f"🔄 `{filename}` 리로드 완료!")
                 except Exception as e:
                     await ctx.send(f"❌ `{filename}` 리로드 실패: {e}")
@@ -99,9 +108,9 @@ async def reload_cogs(ctx, cog_name: str = None):
     # 특정 Cog 리로드
     cog_path = f"Cogs.{cog_name}"
     try:
-        if cog_path in bot.extensions:  # ✅ 이미 로드된 경우만 언로드 후 로드
+        if cog_path in bot.extensions:  # 이미 로드된 경우 언로드 후 로드
             await bot.unload_extension(cog_path)
-        await bot.load_extension(cog_path)  # ✅ 다시 로드
+        await bot.load_extension(cog_path)  # 다시 로드
         await ctx.send(f"🔄 `{cog_name}.py` 리로드 완료!")
     except Exception as e:
         await ctx.send(f"❌ `{cog_name}.py` 리로드 실패: {e}")
@@ -116,7 +125,7 @@ async def load_new_cogs(ctx):
     for filename in os.listdir("Cogs"):
         if filename.endswith(".py") and filename != "__init__.py":
             cog_path = f"Cogs.{filename[:-3]}"
-            if cog_path not in bot.extensions:  # ✅ 새로운 파일만 로드
+            if cog_path not in bot.extensions:  # 새로운 파일만 로드
                 try:
                     await bot.load_extension(cog_path)
                     await ctx.send(f"✅ `{filename}` 추가 완료!")

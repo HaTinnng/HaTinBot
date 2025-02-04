@@ -52,7 +52,7 @@ class StockInfo(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="종목소개", aliases=["주식정보", "주식설명"])
+    @commands.command(name="종목소개")
     async def stock_info(self, ctx, *, stock_name: str = None):
         """
         #종목소개: 전체 주식 목록을 보여줍니다.

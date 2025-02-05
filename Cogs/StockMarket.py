@@ -464,6 +464,11 @@ class StockMarket(commands.Cog):
             
             line = f"{arrow_change}{stock['name']}: {stock['price']}원 ({arrow}) (변동율: {stock['percent_change']}%)"
             msg_lines.append(line)
+            
+            # 상장폐지된 주식은 전체를 취소선 처리
+            if not stock.get("listed", True):
+                stock_info = f"~~{stock_info}~~"
+            msg_lines.append(stock_info)
 
         self.prev_stock_order = new_order
         await ctx.send("\n".join(msg_lines))

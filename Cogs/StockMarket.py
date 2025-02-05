@@ -791,7 +791,7 @@ class StockMarket(commands.Cog):
 
         await ctx.send(f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원") 
 
-    @commands.command(name="유저데이터", aliases=["유저삭제"])
+    @commands.command(name="유저데이터삭제", aliases=["유저삭제"])
     @commands.is_owner()
     async def delete_user_data(self, ctx, user_id: str):
         """

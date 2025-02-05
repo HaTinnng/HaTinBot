@@ -836,7 +836,7 @@ class StockMarket(commands.Cog):
         (쿠폰 입력 제한 없음)
         """
         VALID_COUPON = "jg2131da21809"  # 사용 가능한 쿠폰 코드
-        REWARD_AMOUNT = 200000  # 지급 금액
+        REWARD_AMOUNT = 400000  # 지급 금액
         
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})

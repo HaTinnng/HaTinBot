@@ -435,40 +435,63 @@ class StockMarket(commands.Cog):
             self.db.stocks.insert_one(stock)
         await ctx.send("주식 게임이 초기화되었습니다. (칭호는 유지됩니다.)")
 
-    @commands.command(name="주식", aliases=["주식목록", "현재가","가격"])
+    @commands.command(name="주식", aliases=["주식목록", "현재가", "가격"])
     async def show_stocks(self, ctx):
         """
         #주식:
-        전체 주식 목록을 **가격 오름차순(낮은 가격 → 높은 가격)** 으로 정렬하여 출력합니다.
-        만약 이전 목록에 비해 순위가 변경되었다면 주식 이름 왼쪽에 🔺(상승) 또는 🔻(하락) 아이콘을 표시합니다.
+        # 전체 주식 목록을 **가격 오름차순(낮은 가격 → 높은 가격)** 으로 정렬하여 출력합니다.
+        # 상장폐지된 주식은 전체 정보가 취소선(~취소선~)으로 표시됩니다.
         """
         stocks_list = list(self.db.stocks.find({}).sort("price", 1))
         new_order = {}
         msg_lines = []
-
+        
         for idx, stock in enumerate(stocks_list):
             new_order[stock["_id"]] = idx
             arrow_change = ""
             
+            # 주식 순위 변동 아이콘 (🔺, 🔻)
             if self.prev_stock_order and stock["_id"] in self.prev_stock_order:
                 old_index = self.prev_stock_order[stock["_id"]]
                 if idx < old_index:
                     arrow_change = "🔺"
                 elif idx > old_index:
                     arrow_change = "🔻"
+
+            # 가격 변동 아이콘
             if stock.get("last_change", 0) > 0:
                 arrow = f"🔺{abs(stock['last_change'])}"
             elif stock.get("last_change", 0) < 0:
                 arrow = f"🔻{abs(stock['last_change'])}"
             else:
                 arrow = "⏺0"
-            stock_name = f"~~{stock['name']}~~" if not stock.get("listed", True) else stock['name']
             
-            line = f"{arrow_change}{stock['name']}: {stock['price']}원 ({arrow}) (변동율: {stock['percent_change']}%)"
-            msg_lines.append(line)
+            # 주식 정보 문자열 생성
+            stock_info = f"{arrow_change}**{stock['name']}**: `{stock['price']}원` ({arrow}) (변동율: `{stock['percent_change']}%`)"
             
+            # 상장폐지된 주식은 전체를 취소선 처리
+            if not stock.get("listed", True):
+                stock_info = f"~~{stock_info}~~"
+
+            # 한 번만 추가 (중복 방지)
+            msg_lines.append(stock_info)    
+            
+        
         self.prev_stock_order = new_order
-        await ctx.send("\n".join(msg_lines))
+        
+        # 메시지가 너무 길어질 경우 Discord 메시지 길이 제한(2000자)에 맞게 분할 전송
+        if not msg_lines:
+            await ctx.send("📉 현재 등록된 주식이 없습니다.")
+            return
+        
+        # Discord는 2000자 이상의 메시지를 허용하지 않으므로, 1900자 기준으로 나눠서 전송
+        output = "\n".join(msg_lines)
+        if len(output) > 1900:
+            chunks = [output[i:i + 1900] for i in range(0, len(output), 1900)]
+            for chunk in chunks:
+                await ctx.send(chunk)
+        else:
+            await ctx.send(output)
 
     @commands.command(name="다음변동", aliases=["변동", "변동시간","갱신","다음갱신"])
     async def next_update(self, ctx):

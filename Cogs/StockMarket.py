@@ -791,6 +791,22 @@ class StockMarket(commands.Cog):
 
         await ctx.send(f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원") 
 
+    @commands.command(name="유저데이터", aliases=["유저삭제"])
+    @commands.is_owner()
+    async def delete_user_data(self, ctx, user_id: str):
+        """
+        #유저데이터 [유저ID]: 해당 유저의 모든 데이터를 삭제합니다.
+        이후 #주식참가를 해야 다시 참가할 수 있습니다. (관리자 전용)
+        """
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("해당 유저 데이터를 찾을 수 없습니다.")
+            return
+
+        self.db.users.delete_one({"_id": user_id})
+        await ctx.send(f"유저 ID `{user_id}`의 모든 데이터가 삭제되었습니다. 다시 참가하려면 `#주식참가`를 사용해야 합니다.")
+  
+
 
 
 async def setup(bot):

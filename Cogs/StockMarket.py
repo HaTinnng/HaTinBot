@@ -435,7 +435,7 @@ class StockMarket(commands.Cog):
             self.db.stocks.insert_one(stock)
         await ctx.send("주식 게임이 초기화되었습니다. (칭호는 유지됩니다.)")
 
-    @commands.command(name="주식", aliases=["주식목록", "현재가"])
+    @commands.command(name="주식", aliases=["주식목록", "현재가","가격"])
     async def show_stocks(self, ctx):
         """
         #주식:
@@ -460,6 +460,8 @@ class StockMarket(commands.Cog):
                 arrow = f"🔻{abs(stock['last_change'])}"
             else:
                 arrow = "⏺0"
+            stock_name = f"~~{stock['name']}~~" if not stock.get("listed", True) else stock['name']
+            
             line = f"{arrow_change}{stock['name']}: {stock['price']}원 ({arrow}) (변동율: {stock['percent_change']}%)"
             msg_lines.append(line)
         self.prev_stock_order = new_order

@@ -881,5 +881,72 @@ class StockMarket(commands.Cog):
         await ctx.send(f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{REWARD_AMOUNT}원`을 지급받았습니다.\n"
                        f"현재 잔액: `{new_money}원`")
 
+    @commands.command(name="유저정보", aliases=["유저조회"])
+    @commands.has_permissions(administrator=True)  # 관리자 권한 필요
+    async def get_user_info(self, ctx, user: discord.Member = None):
+        """
+        #유저정보 [@멘션 또는 ID] :
+        # 관리자 전용 명령어로 특정 유저 또는 전체 유저의 자산 정보를 조회합니다.
+        """
+        if user:
+            user_id = str(user.id)
+            user_data = self.db.users.find_one({"_id": user_id})
+            
+            if not user_data:
+                await ctx.send(f"❌ `{user.display_name}`님은 주식 시스템에 등록되지 않았습니다.")
+                return
+                
+            # 유저의 총 자산 계산 (현금 + 보유 주식 평가액)
+            total_assets = user_data.get("money", 0)
+            portfolio = user_data.get("portfolio", {})
+            
+            for stock_id, holding in portfolio.items():
+                stock = self.db.stocks.find_one({"_id": stock_id})
+                if stock:
+                    total_assets += stock["price"] * holding.get("amount", 0)
+            
+            embed = discord.Embed(title="📜 유저 정보", color=discord.Color.blue())
+            embed.add_field(name="닉네임", value=user_data.get("username", user.display_name), inline=False)
+            embed.add_field(name="디스코드 ID", value=user.id, inline=False)
+            embed.add_field(name="총 자산", value=f"{total_assets:,}원", inline=False)
+            
+            await ctx.send(embed=embed)
+            
+        else:
+            # 전체 유저 조회 (최대 10명까지만 표시)
+            users = self.db.users.find({})
+            user_list = []
+            
+            for user_data in users:
+                user_id = user_data["_id"]
+                discord_user = ctx.guild.get_member(int(user_id))
+                nickname = user_data.get("username", "알 수 없음")
+                total_assets = user_data.get("money", 0)
+                
+                portfolio = user_data.get("portfolio", {})
+                for stock_id, holding in portfolio.items():
+                    stock = self.db.stocks.find_one({"_id": stock_id})
+                    if stock:
+                        total_assets += stock["price"] * holding.get("amount", 0)
+                display_name = discord_user.display_name if discord_user else "탈퇴한 유저"
+                user_list.append(f"👤 `{display_name}` (ID: `{user_id}`) - **{total_assets:,}원**")
+            
+            if not user_list:
+                await ctx.send("❌ 등록된 유저가 없습니다.")
+                return
+            
+            # 최대 10명까지 표시
+            user_list = user_list[:10]
+            
+            embed = discord.Embed(title="📜 전체 유저 정보 (상위 10명)", color=discord.Color.green())
+            embed.description = "\n".join(user_list)
+            await ctx.send(embed=embed)
+
+    @get_user_info.error
+    async def get_user_info_error(ctx, error):
+        """관리자가 아닌 사용자가 명령어를 사용할 경우 오류 메시지 출력"""
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send("❌ 이 명령어는 관리자만 사용할 수 있습니다.")
+
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

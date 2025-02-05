@@ -273,46 +273,47 @@ class StockMarket(commands.Cog):
         next_time = min(candidate_times, key=lambda t: t)
         delta = next_time - now
         return next_time, delta
-        
+    
     def update_stocks(self):
-    """
-    모든 주식의 가격을 ±23.78% 변동폭 내에서 변동합니다.
-    가격이 13원 미만이 되면 상장폐지되며, 가격이 0원이 되고 변동이 중단됩니다.
-    """
-    if not self.is_trading_open():
-        return
+        """
+        모든 주식의 가격을 ±23.78% 변동폭 내에서 변동합니다.
+        가격이 13원 미만이 되면 상장폐지되며, 가격이 0원이 되고 변동이 중단됩니다.
+        """
+        if not self.is_trading_open():
+            return
+        
+        cursor = self.db.stocks.find({})
+        for stock in cursor:
+            if not stock.get("listed", True):
+                # 상장폐지된 주식은 가격이 0원이 되며, 이후 변동되지 않음
+                self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": {"price": 0}})
+                continue  # 변동을 적용하지 않음
+            
+            old_price = stock["price"]
+            percent_change = random.uniform(-23.78, 23.78)  # 모든 주식 동일 변동폭 적용
+            new_price = int(old_price * (1 + percent_change / 100))
+            new_price = max(new_price, 1)
+            
+            # 가격이 13원 미만이면 상장폐지 처리 (가격 0원으로 설정)
+            if new_price < 13:
+                self.db.stocks.update_one(
+                    {"_id": stock["_id"]},
+                    {"$set": {"listed": False, "price": 0}}
+                )
+                continue
 
-    cursor = self.db.stocks.find({})
-    for stock in cursor:
-        if not stock.get("listed", True):
-            # 상장폐지된 주식은 가격이 0원이 되며, 이후 변동되지 않음
-            self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": {"price": 0}})
-            continue  # 변동을 적용하지 않음
+            update_fields = {
+                "last_change": new_price - old_price,
+                "percent_change": round(percent_change, 2),
+                "price": new_price,
+            }
+            history = stock.get("history", [])
+            history.append(new_price)
+            history = history[-5:]
+            update_fields["history"] = history
+            
+            self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": update_fields})
 
-        old_price = stock["price"]
-        percent_change = random.uniform(-23.78, 23.78)  # 모든 주식 동일 변동폭 적용
-        new_price = int(old_price * (1 + percent_change / 100))
-        new_price = max(new_price, 1)
-
-        # 가격이 13원 미만이면 상장폐지 처리 (가격 0원으로 설정)
-        if new_price < 13:
-            self.db.stocks.update_one(
-                {"_id": stock["_id"]},
-                {"$set": {"listed": False, "price": 0}}
-            )
-            continue
-
-        update_fields = {
-            "last_change": new_price - old_price,
-            "percent_change": round(percent_change, 2),
-            "price": new_price,
-        }
-        history = stock.get("history", [])
-        history.append(new_price)
-        history = history[-5:]
-        update_fields["history"] = history
-
-        self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": update_fields})
     @tasks.loop(seconds=10)
     async def stock_update_loop(self):
         """

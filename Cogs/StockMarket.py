@@ -178,13 +178,15 @@ def init_stocks():
         "listed": True,
         "history": []
     } 
-  니마트",
+    stocks["16"] = {
+        "_id": "16",
+        "name": "후니마트",
         "price": random.randint(740000, 750000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
         "history": []
-    }    
+    } 
     # 각 종목의 history에 최초 가격 추가
     for s in stocks.values():
         s["history"].append(s["price"])

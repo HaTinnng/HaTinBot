@@ -826,6 +826,7 @@ class StockMarket(commands.Cog):
         await ctx.send(f"✅ 새로운 주식 `{stock_name}`이 추가되었습니다! 초기 가격: {new_stock['price']}원")
 
     @commands.command(name="주식쿠폰입력")
+    @commands.has_permissions(administrator=True)  # 관리자 이상만 사용 가능
     async def redeem_stock_coupon(self, ctx, coupon_code: str):
         """
         #주식쿠폰입력 [쿠폰코드]:

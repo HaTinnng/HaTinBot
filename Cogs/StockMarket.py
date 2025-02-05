@@ -825,9 +825,32 @@ class StockMarket(commands.Cog):
         self.db.stocks.insert_one(new_stock)
         await ctx.send(f"✅ 새로운 주식 `{stock_name}`이 추가되었습니다! 초기 가격: {new_stock['price']}원")
 
-  
+    @commands.command(name="주식쿠폰입력")
+    async def redeem_stock_coupon(self, ctx, coupon_code: str):
+        """
+        #주식쿠폰입력 [쿠폰코드]:
+        올바른 쿠폰 코드를 입력하면 200,000원을 추가 지급합니다.
+        (쿠폰 입력 제한 없음)
+        """
+        VALID_COUPON = "jg2131da21809"  # 사용 가능한 쿠폰 코드
+        REWARD_AMOUNT = 200000  # 지급 금액
+        
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가` 명령어로 참가해주세요.")
+            return
 
+        if coupon_code != VALID_COUPON:
+            await ctx.send("❌ 유효하지 않은 쿠폰 코드입니다. 다시 확인해주세요.")
+            return
 
+        # 쿠폰 적용 (제한 없이 계속 사용 가능)
+        new_money = user.get("money", 0) + REWARD_AMOUNT
+        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money}})
+        await ctx.send(f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{REWARD_AMOUNT}원`을 지급받았습니다.\n"
+                       f"현재 잔액: `{new_money}원`")
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

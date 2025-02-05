@@ -178,15 +178,6 @@ def init_stocks():
         "listed": True,
         "history": []
     } 
-    stocks["16"] = {
-        "_id": "16",
-        "name": "후니마트",
-        "price": random.randint(740000, 750000),
-        "last_change": 0,
-        "percent_change": 0,
-        "listed": True,
-        "history": []
-    } 
     # 각 종목의 history에 최초 가격 추가
     for s in stocks.values():
         s["history"].append(s["price"])
@@ -809,6 +800,31 @@ class StockMarket(commands.Cog):
 
         self.db.users.delete_one({"_id": user_id})
         await ctx.send(f"유저 ID `{user_id}`의 모든 데이터가 삭제되었습니다. 다시 참가하려면 `#주식참가`를 사용해야 합니다.")
+
+    @commands.command(name="주식추가")
+    @commands.is_owner()
+    async def add_stock(self, ctx, stock_name: str, min_price: int, max_price: int):
+        """
+        #주식추가 [이름] [최소 가격] [최대 가격]:
+        새로운 주식을 추가합니다. (관리자 전용)
+        """
+        if self.db.stocks.find_one({"name": stock_name}):
+            await ctx.send("이미 존재하는 주식입니다.")
+            return
+
+        new_stock = {
+            "_id": str(self.db.stocks.count_documents({}) + 1),
+            "name": stock_name,
+            "price": random.randint(min_price, max_price),
+            "last_change": 0,
+            "percent_change": 0,
+            "listed": True,
+            "history": []
+        }
+        new_stock["history"].append(new_stock["price"])  # 최초 가격 기록 추가
+        self.db.stocks.insert_one(new_stock)
+        await ctx.send(f"✅ 새로운 주식 `{stock_name}`이 추가되었습니다! 초기 가격: {new_stock['price']}원")
+
   
 
 

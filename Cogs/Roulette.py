@@ -95,9 +95,9 @@ class Roulette(commands.Cog):
             "☆": 5,   # 5% 확률
             "💎": 7,   # 7% 확률
             "🍒": 10,  # 10% 확률
-            "🍀": 13,  # 13%
-            "🔔": 20,  # 20%
-            "❌": 41   # 41% (꽝)
+            "🍀": 15,  # 15%
+            "🔔": 21,  # 21%
+            "❌": 38   # 38% (꽝)
         }
 
         # 3개의 슬롯을 가중치에 따라 랜덤 선택
@@ -109,33 +109,33 @@ class Roulette(commands.Cog):
         if result == "777":
             payout_multiplier = 77  # 777: 77배
         elif result == "★★★":
-            payout_multiplier = 50  # ★★★: 50배
+            payout_multiplier = 52  # ★★★: 52배
         elif result == "☆☆☆":
-            payout_multiplier = 32  # ☆☆☆: 32배
+            payout_multiplier = 38  # ☆☆☆: 38배
         elif result == "💎💎💎":
-            payout_multiplier = 20  # 20배
+            payout_multiplier = 25  # 25배
         elif result == "🍒🍒🍒":
-            payout_multiplier = 12  # 12배
+            payout_multiplier = 18  # 18배
         elif result == "🍀🍀🍀":
-            payout_multiplier = 8   # 8배
+            payout_multiplier = 12   # 12배
         elif result == "🔔🔔🔔":
-            payout_multiplier = 3   # 3배    
+            payout_multiplier = 5   # 5배    
         else:
             # 2개 일치 보상 (차등 지급)
             if symbols.count("7") == 2:
-                payout_multiplier = 21  # 7이 2개 → 21배
+                payout_multiplier = 27  # 7이 2개 → 27배
             elif symbols.count("★") == 2:
-                payout_multiplier = 15  # ★가 2개 → 15배
+                payout_multiplier = 18  # ★가 2개 → 18배
             elif symbols.count("☆") == 2:
-                payout_multiplier = 9   # ☆가 2개 → 9배
+                payout_multiplier = 12   # ☆가 2개 → 12배
             elif symbols.count("💎") == 2:
-                payout_multiplier = 4   # 💎이 2개 → 4배
+                payout_multiplier = 8   # 💎이 2개 → 8배
             elif symbols.count("🍒") == 2:
-                payout_multiplier = 2   # 🍒이 2개 → 2배
+                payout_multiplier = 4   # 🍒이 2개 → 4배
             elif symbols.count("🍀") == 2:
-                payout_multiplier = 1   # 🍀이 2개 → 1배
+                payout_multiplier = 2   # 🍀이 2개 → 2배
             elif symbols.count("🔔") == 2:
-                payout_multiplier = 0.5 # 🔔이 2개 → 0.5배    
+                payout_multiplier = 1 # 🔔이 2개 → 1배    
 
         payout = bet_amount * payout_multiplier  # 지급 금액 계산
         new_balance = user["money"] - bet_amount + payout  # 배팅 금액 차감 후 계산

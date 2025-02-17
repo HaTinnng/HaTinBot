@@ -16,7 +16,7 @@ class LottoHelp(commands.Cog):
             color=discord.Color.green()
         )
 
-        embed.add_field(name="🛒 복권 구매", value="`#복권구매 n` - 복권을 n장 구매 (1장 = 1,000원, 최대 10장)", inline=False)
+        embed.add_field(name="🛒 복권 구매", value="`#복권구매 n` - 복권을 n장 구매 (1장 = 5,000원, 최대 10장)", inline=False)
         embed.add_field(name="🎯 당첨 결과 확인", value="`#복권결과` - 이번 주 당첨 번호 확인", inline=False)
         embed.add_field(name="🎟 내 복권 조회", value="`#복권확인` - 내가 구매한 복권과 당첨 여부 확인", inline=False)
         embed.add_field(name="⏳ 복권 추첨", value="매주 **일요일 21:00 (KST)** 자동 추첨", inline=False)

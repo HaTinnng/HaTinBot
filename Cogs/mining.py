@@ -158,13 +158,13 @@ SALE_PRICES = {
     "운석": 7500,
     "포스코어": 12000,
     "혈액팩": 30000,
-  
 }
 
 # --------------------------
 # 장비 이름 반환 함수
 # --------------------------
 def get_equipment_name(level: int) -> str:
+    # 예시 이름 체계 (원하는 대로 수정 가능)
     if level == 1:
         return "맨손"
     elif level == 2:
@@ -174,7 +174,7 @@ def get_equipment_name(level: int) -> str:
     elif level == 4:
         return f"너클 (Lv.{level})"
     elif level == 5:
-        return f"독너틀 (Lv.{level})"
+        return f"독너클 (Lv.{level})"
     elif level == 6:
         return f"막대기 (Lv.{level})"
     elif level == 7:
@@ -201,8 +201,8 @@ def get_equipment_name(level: int) -> str:
         return f"효율 네더라이트 곡괭이 (Lv.{level})"
     elif level == 18:
         return f"이리듐 곡괭이 (Lv.{level})"
-    elif level == 11:
-        return f"최강의 이리듐 곡괭이 (Lv.{level})"  
+    elif level == 19:
+        return f"최강의 이리듐 곡괭이 (Lv.{level})"
     else:
         return f"여래신장 (Lv.{level})"
 
@@ -223,7 +223,7 @@ class MiningSystem(commands.Cog):
     def update_user_profile(self, user_id, profile):
         self.db.mining_users.update_one({"_id": user_id}, {"$set": profile})
     
-    # 수정: 광물 요구사항 제거하고, 강화 비용과 성공 확률 산정 (장비 최대 20)
+    # 강화 비용과 성공 확률 (장비 최대 20)
     # 강화 비용은 100 * 현재 장비 레벨, 성공 확률은 max(25, 100 - (현재장비레벨 * 5))
     # 단, 장비 레벨 11 이상부터 강화 실패 시 하락 확률 발생 (하락 확률 = (현재장비레벨 - 10) * 2)
     def get_equipment_upgrade_requirements(self, current_level):
@@ -253,7 +253,7 @@ class MiningSystem(commands.Cog):
             "_id": user_id,
             "level": 1,
             "xp": 0,
-            "next_xp": 100,
+            "next_xp": 100,  # 100 * (1^2) = 100
             "equipment": "맨손",
             "equipment_level": 1,
             "inventory": {},
@@ -304,7 +304,9 @@ class MiningSystem(commands.Cog):
             "collected": {},      # 세션 동안 획득한 광물 (dict)
             "xp_gained": 0,
             "active": True,
-            "ctx": ctx
+            "ctx": ctx,
+            "cycle_start": None,  # 현재 사이클 시작 시각
+            "current_cycle_duration": None  # 현재 사이클의 지속 시간
         }
         self.active_sessions[user_id] = session
         await ctx.send(f"{ctx.author.mention} **{mine_name}** 채취 세션이 시작되었습니다!")
@@ -315,13 +317,18 @@ class MiningSystem(commands.Cog):
                 await ctx.send(f"{ctx.author.mention} 인벤토리가 꽉 차서 채취 세션을 종료합니다.")
                 session["active"] = False
                 break
+            # 모든 광산은 맨손 기준 3시간(10800초) 채취, 장비 레벨에 따라 단축됨.
             effective_time = max(int(10800 / profile["equipment_level"]), 1)
+            # 기록: 현재 사이클 시작 시각과 지속시간 저장
+            session["cycle_start"] = time.time()
+            session["current_cycle_duration"] = effective_time
             try:
                 await asyncio.sleep(effective_time)
             except asyncio.CancelledError:
                 break
             session["total_time"] += effective_time
-            num_drops = random.choices([1, 2, 3], weights=[80, 10, 10])[0]
+            # 모든 사이클마다 한번만 광물 드랍 (한 번에 하나씩)
+            num_drops = 1
             drops = []
             mine = MINES[mine_name]
             for _ in range(num_drops):
@@ -350,9 +357,11 @@ class MiningSystem(commands.Cog):
                 profile["inventory"] = {}
             for mineral, qty in collected_this_cycle.items():
                 profile["inventory"][mineral] = profile["inventory"].get(mineral, 0) + qty
+            # 경험치 부여
             xp_gained = random.randint(10, 25)
             profile["xp"] = profile.get("xp", 0) + xp_gained
             session["xp_gained"] += xp_gained
+            # 레벨업 처리: 다음 레벨 경험치는 100 * (현재레벨^2)
             while profile["xp"] >= profile.get("next_xp", 100):
                 profile["xp"] -= profile["next_xp"]
                 profile["level"] += 1
@@ -439,6 +448,46 @@ class MiningSystem(commands.Cog):
         if user_id in self.active_sessions:
             del self.active_sessions[user_id]
         await ctx.send(f"{ctx.author.mention} 채취 세션이 중지되었습니다.\n{result}")
+    
+    # --------------------------
+    # #광산결과 명령어 (채취 세션 결과 조회, 세션 중지는 아님)
+    # --------------------------
+    @commands.command(name="광산결과")
+    async def mining_result(self, ctx):
+        """
+        #광산결과:
+        진행 중인 채취 세션이 있다면,
+         - 채취 시작 시각부터 현재까지의 누적 시간,
+         - 다음 광물 드랍까지 남은 시간,
+         - 세션 동안 획득한 경험치,
+         - 세션 동안 획득한 광물 목록
+        을 표시합니다.
+        (채취 세션은 중지되지 않습니다.)
+        """
+        user_id = str(ctx.author.id)
+        if user_id not in self.active_sessions:
+            await ctx.send(f"{ctx.author.mention} 진행 중인 채취 세션이 없습니다.")
+            return
+        session = self.active_sessions[user_id]
+        elapsed = int(time.time() - session["start_time"])
+        hours = elapsed // 3600
+        minutes = (elapsed % 3600) // 60
+        # 다음 광물 드랍까지 남은 시간 계산
+        if session.get("cycle_start") and session.get("current_cycle_duration"):
+            cycle_elapsed = time.time() - session["cycle_start"]
+            remaining = max(int(session["current_cycle_duration"] - cycle_elapsed), 0)
+        else:
+            remaining = 0
+        result = f"**채취 시작 후 경과 시간:** {hours}시간 {minutes}분\n"
+        result += f"**다음 광물 드랍까지 남은 시간:** {remaining}초\n"
+        result += f"**세션 동안 획득한 경험치:** {session['xp_gained']}\n"
+        result += "**세션 동안 획득한 광물:**\n"
+        if session["collected"]:
+            for mineral, qty in session["collected"].items():
+                result += f"- {mineral}: {qty}개\n"
+        else:
+            result += "없음\n"
+        await ctx.send(f"{ctx.author.mention} 채취 세션 결과:\n{result}")
     
     # --------------------------
     # 인벤토리 조회 명령어
@@ -535,7 +584,6 @@ class MiningSystem(commands.Cog):
             profile["equipment"] = get_equipment_name(profile["equipment_level"])
             result_msg = f"{ctx.author.mention} **강화 성공!** 현재 장비: {profile['equipment']}"
         else:
-            # 장비 레벨 11 이상부터 하락 확률 적용
             if current_level >= 11:
                 downgrade_chance = (current_level - 10) * 2
                 if random.randint(1, 100) <= downgrade_chance:

@@ -207,6 +207,33 @@ def get_equipment_name(level: int) -> str:
         return f"여래신장 (Lv.{level})"
 
 # --------------------------
+# Confirm View for 완전 초기화
+# --------------------------
+class ResetConfirmView(discord.ui.View):
+    def __init__(self, author: discord.User, timeout=30):
+        super().__init__(timeout=timeout)
+        self.author = author
+        self.value = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("이 명령어는 봇 소유자만 사용할 수 있습니다.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="동의", style=discord.ButtonStyle.green)
+    async def agree(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        self.stop()
+        await interaction.response.edit_message(content="모든 광산 데이터가 삭제됩니다.", view=None)
+
+    @discord.ui.button(label="그만두기", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        self.stop()
+        await interaction.response.edit_message(content="초기화가 취소되었습니다.", view=None)
+
+# --------------------------
 # MiningSystem Cog
 # --------------------------
 class MiningSystem(commands.Cog):
@@ -235,15 +262,24 @@ class MiningSystem(commands.Cog):
         return 200 * (current_capacity - 5 + 1)
     
     # --------------------------
-    # 게임 시작 명령어
+    # 게임 시작 명령어 (닉네임 추가, 중복 및 빈칸 체크)
     # --------------------------
     @commands.command(name="광산시작")
-    async def start_game(self, ctx):
+    async def start_game(self, ctx, *, nickname: str):
         """
-        #광산시작:
+        #광산시작 [닉네임]:
         이 명령어를 사용하여 광산 게임을 시작합니다.
-        아직 시작하지 않았다면 프로필이 생성됩니다.
+        닉네임은 반드시 입력해야 하며, 빈칸 또는 중복된 닉네임은 허용되지 않습니다.
         """
+        nickname = nickname.strip()
+        if not nickname:
+            await ctx.send(f"{ctx.author.mention} 닉네임은 빈칸일 수 없습니다.")
+            return
+        # 중복 닉네임 체크 (이미 등록된 닉네임이 있는지)
+        if self.db.mining_users.find_one({"nickname": nickname}):
+            await ctx.send(f"{ctx.author.mention} 이미 사용 중인 닉네임입니다. 다른 닉네임을 선택해주세요.")
+            return
+        
         user_id = str(ctx.author.id)
         profile = self.get_user_profile(user_id)
         if profile:
@@ -251,9 +287,10 @@ class MiningSystem(commands.Cog):
             return
         new_profile = {
             "_id": user_id,
+            "nickname": nickname,
             "level": 1,
             "xp": 0,
-            "next_xp": 100,  # 100 * (1^2) = 100
+            "next_xp": 100,  # 100 * (1^2)
             "equipment": "맨손",
             "equipment_level": 1,
             "inventory": {},
@@ -261,7 +298,50 @@ class MiningSystem(commands.Cog):
             "루찌": 0
         }
         self.db.mining_users.insert_one(new_profile)
-        await ctx.send(f"{ctx.author.mention} 광산 게임을 시작했습니다! 환영합니다!")
+        await ctx.send(f"{ctx.author.mention} 광산 게임을 시작했습니다! 환영합니다, **{nickname}**!")
+    
+    # --------------------------
+    # 광산유저삭제 명령어 (봇 소유자 전용)
+    # --------------------------
+    @commands.command(name="광산유저삭제")
+    @commands.is_owner()
+    async def delete_user(self, ctx, *, nickname: str):
+        """
+        #광산유저삭제 [닉네임]:
+        봇 소유자 전용 명령어입니다.
+        지정한 닉네임을 가진 유저의 광산 데이터를 삭제합니다.
+        """
+        nickname = nickname.strip()
+        if not nickname:
+            await ctx.send("닉네임은 빈칸일 수 없습니다.")
+            return
+        result = self.db.mining_users.delete_one({"nickname": nickname})
+        if result.deleted_count:
+            await ctx.send(f"**{nickname}** 닉네임을 가진 유저의 데이터가 삭제되었습니다.")
+        else:
+            await ctx.send(f"닉네임 **{nickname}**을 가진 유저를 찾을 수 없습니다.")
+    
+    # --------------------------
+    # 광산완전초기화 명령어 (봇 소유자 전용)
+    # --------------------------
+    @commands.command(name="광산완전초기화")
+    @commands.is_owner()
+    async def full_reset(self, ctx):
+        """
+        #광산완전초기화:
+        봇 소유자 전용 명령어입니다.
+        경고: 이 명령어를 실행하면 광산 관련 모든 데이터(광산 게임 데이터)가 삭제됩니다.
+        주식 정보는 삭제되지 않습니다.
+        """
+        view = ResetConfirmView(ctx.author, timeout=30)
+        await ctx.send("경고: 정말로 모든 광산 데이터를 삭제하시겠습니까? 주식 정보는 삭제되지 않습니다.", view=view)
+        await view.wait()
+        if view.value:
+            # 광산 데이터는 mining_users 컬렉션의 모든 문서를 삭제
+            self.db.mining_users.delete_many({})
+            await ctx.send("모든 광산 데이터가 삭제되었습니다.")
+        else:
+            await ctx.send("광산 초기화가 취소되었습니다.")
     
     # --------------------------
     # 광산프로필 명령어
@@ -280,6 +360,7 @@ class MiningSystem(commands.Cog):
         inventory = profile.get("inventory", {})
         used = sum(inventory.values()) if inventory else 0
         embed = discord.Embed(title=f"{ctx.author.display_name}님의 광산 프로필", color=discord.Color.gold())
+        embed.add_field(name="닉네임", value=profile.get("nickname", "N/A"), inline=True)
         embed.add_field(name="유저 레벨", value=profile["level"], inline=True)
         embed.add_field(name="장비", value=profile["equipment"], inline=True)
         embed.add_field(name="보유 루찌", value=profile["루찌"], inline=True)
@@ -319,7 +400,6 @@ class MiningSystem(commands.Cog):
                 break
             # 모든 광산은 맨손 기준 3시간(10800초) 채취, 장비 레벨에 따라 단축됨.
             effective_time = max(int(10800 / profile["equipment_level"]), 1)
-            # 기록: 현재 사이클 시작 시각과 지속시간 저장
             session["cycle_start"] = time.time()
             session["current_cycle_duration"] = effective_time
             try:
@@ -327,7 +407,7 @@ class MiningSystem(commands.Cog):
             except asyncio.CancelledError:
                 break
             session["total_time"] += effective_time
-            # 모든 사이클마다 한번만 광물 드랍 (한 번에 하나씩)
+            # 모든 사이클마다 한 개의 광물만 드랍
             num_drops = 1
             drops = []
             mine = MINES[mine_name]
@@ -357,11 +437,9 @@ class MiningSystem(commands.Cog):
                 profile["inventory"] = {}
             for mineral, qty in collected_this_cycle.items():
                 profile["inventory"][mineral] = profile["inventory"].get(mineral, 0) + qty
-            # 경험치 부여
             xp_gained = random.randint(10, 25)
             profile["xp"] = profile.get("xp", 0) + xp_gained
             session["xp_gained"] += xp_gained
-            # 레벨업 처리: 다음 레벨 경험치는 100 * (현재레벨^2)
             while profile["xp"] >= profile.get("next_xp", 100):
                 profile["xp"] -= profile["next_xp"]
                 profile["level"] += 1
@@ -450,7 +528,7 @@ class MiningSystem(commands.Cog):
         await ctx.send(f"{ctx.author.mention} 채취 세션이 중지되었습니다.\n{result}")
     
     # --------------------------
-    # #광산결과 명령어 (채취 세션 결과 조회, 세션 중지는 아님)
+    # #광산결과 명령어 (채취 세션 결과 조회, 세션 중지 아님)
     # --------------------------
     @commands.command(name="광산결과")
     async def mining_result(self, ctx):
@@ -470,15 +548,15 @@ class MiningSystem(commands.Cog):
             return
         session = self.active_sessions[user_id]
         elapsed = int(time.time() - session["start_time"])
-        hours = elapsed // 3600
-        minutes = (elapsed % 3600) // 60
+        total_hours = elapsed // 3600
+        total_minutes = (elapsed % 3600) // 60
         # 다음 광물 드랍까지 남은 시간 계산
         if session.get("cycle_start") and session.get("current_cycle_duration"):
             cycle_elapsed = time.time() - session["cycle_start"]
             remaining = max(int(session["current_cycle_duration"] - cycle_elapsed), 0)
         else:
             remaining = 0
-        result = f"**채취 시작 후 경과 시간:** {hours}시간 {minutes}분\n"
+        result = f"**채취 시작 후 누적 시간:** {total_hours}시간 {total_minutes}분\n"
         result += f"**다음 광물 드랍까지 남은 시간:** {remaining}초\n"
         result += f"**세션 동안 획득한 경험치:** {session['xp_gained']}\n"
         result += "**세션 동안 획득한 광물:**\n"

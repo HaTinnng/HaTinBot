@@ -75,9 +75,9 @@ class Roulette(commands.Cog):
             elif symbols.count("💎") == 2:
                 payout_multiplier = 4  # 💎이 2개 → 4배
             elif symbols.count("🍒") == 2:
-                payout_multiplier = 2: # 🍒이 2개 → 2배
+                payout_multiplier = 2 # 🍒이 2개 → 2배
             elif symbols.count("🍀") == 2:
-                payout_multiplier = 1: # 🍀이 2개 → 1배
+                payout_multiplier = 1 # 🍀이 2개 → 1배
 
         payout = bet_amount * payout_multiplier  # 지급 금액 계산
         new_balance = user["money"] - bet_amount + payout  # 배팅 금액 차감 후 계산

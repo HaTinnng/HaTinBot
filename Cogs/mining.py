@@ -63,7 +63,7 @@ MINES = {
             "에메랄드": {"chance": 5, "min_qty": 1, "max_qty": 1},
         }
     },
-    "특급급광산": {
+    "특급광산": {
         "req_user_level": 10,
         "req_equipment_level": 9,
         "minerals": {

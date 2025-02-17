@@ -15,6 +15,7 @@ class Lotto(commands.Cog):
         self.bot = bot
         self.mongo_client = MongoClient(MONGO_URI)
         self.db = self.mongo_client[DB_NAME]
+        self.lotto_draw_task = None
 
         # 매주 일요일 21:00 (KST) 자동 추첨
         self.lotto_draw_task.start()

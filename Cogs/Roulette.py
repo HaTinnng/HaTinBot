@@ -1,5 +1,6 @@
 import discord
 import random
+import asyncio  # asyncio 모듈 추가
 from discord.ext import commands
 from pymongo import MongoClient
 import os
@@ -38,7 +39,7 @@ class Roulette(commands.Cog):
         self.mongo_client = MongoClient(MONGO_URI)
         self.db = self.mongo_client[DB_NAME]
 
-    @commands.command(name="룰렛",aliases=["슬롯"])
+    @commands.command(name="룰렛", aliases=["슬롯"])
     async def roulette(self, ctx, bet: str):
         """
         #룰렛 [금액/다/전부/올인]:
@@ -68,7 +69,7 @@ class Roulette(commands.Cog):
             await ctx.send(embed=warning_embed, view=view)
             await view.wait()
             if view.value is None:
-                await ctx.send("시간 초과로 룰렛이 취소되었습니다.")
+                await ctx.send(f"{ctx.author.mention}님, 시간 초과로 룰렛이 취소되었습니다.")
                 return
             if not view.value:
                 return
@@ -95,7 +96,7 @@ class Roulette(commands.Cog):
             "💎": 7,   # 7% 확률
             "🍒": 10,  # 10% 확률
             "🍀": 13,  # 13%
-            "🔔": 20,   # 20%
+            "🔔": 20,  # 20%
             "❌": 41   # 41% (꽝)
         }
 
@@ -114,7 +115,7 @@ class Roulette(commands.Cog):
         elif result == "💎💎💎":
             payout_multiplier = 20  # 20배
         elif result == "🍒🍒🍒":
-            payout_multiplier = 12   # 12배
+            payout_multiplier = 12  # 12배
         elif result == "🍀🍀🍀":
             payout_multiplier = 8   # 8배
         elif result == "🔔🔔🔔":
@@ -124,7 +125,7 @@ class Roulette(commands.Cog):
             if symbols.count("7") == 2:
                 payout_multiplier = 21  # 7이 2개 → 21배
             elif symbols.count("★") == 2:
-                payout_multiplier = 15   # ★가 2개 → 15배
+                payout_multiplier = 15  # ★가 2개 → 15배
             elif symbols.count("☆") == 2:
                 payout_multiplier = 9   # ☆가 2개 → 9배
             elif symbols.count("💎") == 2:
@@ -134,13 +135,18 @@ class Roulette(commands.Cog):
             elif symbols.count("🍀") == 2:
                 payout_multiplier = 1   # 🍀이 2개 → 1배
             elif symbols.count("🔔") == 2:
-                payout_multiplier = 0.5   # 🔔이 2개 → 0.5배    
+                payout_multiplier = 0.5 # 🔔이 2개 → 0.5배    
 
         payout = bet_amount * payout_multiplier  # 지급 금액 계산
         new_balance = user["money"] - bet_amount + payout  # 배팅 금액 차감 후 계산
 
         # 데이터베이스에 반영
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_balance}})
+
+        # 슬롯머신 돌리는 동안 메시지 전송
+        loading_message = await ctx.send("⏳슬롯머신을 돌리고 있습니다...")
+        await asyncio.sleep(3)
+        await loading_message.delete()
 
         # 결과 메시지
         embed = discord.Embed(title="🎰 777 룰렛 결과 🎰", color=discord.Color.gold())

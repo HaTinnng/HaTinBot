@@ -3,7 +3,7 @@ import random
 from discord.ext import commands, tasks
 from pymongo import MongoClient
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 
 # MongoDB 설정
@@ -15,28 +15,22 @@ class Lotto(commands.Cog):
         self.bot = bot
         self.mongo_client = MongoClient(MONGO_URI)
         self.db = self.mongo_client[DB_NAME]
-        self.lotto_draw_task = None
 
-        # 매주 일요일 21:00 (KST) 자동 추첨
+        # 태스크 시작 (봇이 실행될 때)
         self.lotto_draw_task.start()
 
     def cog_unload(self):
+        """Cog이 언로드될 때 루프 중지"""
         self.lotto_draw_task.cancel()
 
     def get_seoul_time(self):
+        """현재 한국 시간 반환"""
         return datetime.now(pytz.timezone("Asia/Seoul"))
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        """봇이 준비되면 태스크 시작"""
-        if not self.lotto_draw_task:
-            self.lotto_draw_task = self.lotto_draw_task_func()
-            self.lotto_draw_task.start()
 
     @commands.command(name="복권구매")
     async def buy_lotto(self, ctx, ticket_count: int):
         """
-        #복권구매 [n] : 1장당 1,000원, 최대 10장까지 구매 가능
+        #복권구매 [n] : 1장당 5,000원, 최대 10장까지 구매 가능
         """
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
@@ -71,7 +65,7 @@ class Lotto(commands.Cog):
             self.db.lotto.delete_one({"_id": user_id})  # 새로운 주가 시작되면 초기화
 
         # 복권 구매 (1~45 중 6개 랜덤)
-        tickets = [[random.randint(1, 45) for _ in range(6)] for _ in range(ticket_count)]
+        tickets = [sorted(random.sample(range(1, 46), 6)) for _ in range(ticket_count)]
         self.db.users.update_one({"_id": user_id}, {"$inc": {"money": -cost}})
         self.db.lotto.update_one(
             {"_id": user_id},
@@ -111,7 +105,7 @@ class Lotto(commands.Cog):
 
         # 사용자가 구매한 복권 번호 표시
         tickets = user_lotto["tickets"]
-        ticket_messages = [f"🎟 `{i+1}번`: `{sorted(ticket)}`" for i, ticket in enumerate(tickets)]
+        ticket_messages = [f"🎟 `{i+1}번`: `{ticket}`" for i, ticket in enumerate(tickets)]
 
         # 이번 주 추첨 결과 확인
         lotto_data = self.db.lotto_result.find_one({"week": current_week})
@@ -125,24 +119,10 @@ class Lotto(commands.Cog):
 
         for idx, ticket in enumerate(tickets, start=1):
             matched = len(set(ticket) & winning_numbers)
-            prize = 0
-
-            if matched == 6:
-                prize = 100000000  # 1등 (1억 원)
-                result_messages.append(f"🏆 `{idx}번`: `{sorted(ticket)}` → **1등 (100,000,000원)** 🎉")
-            elif matched == 5:
-                prize = 5000000  # 2등 (500만 원)
-                result_messages.append(f"🥈 `{idx}번`: `{sorted(ticket)}` → **2등 (5,000,000원)** 🎊")
-            elif matched == 4:
-                prize = 500000  # 3등 (50만 원)
-                result_messages.append(f"🥉 `{idx}번`: `{sorted(ticket)}` → **3등 (500,000원)** 🎉")
-            elif matched == 3:
-                prize = 5000  # 4등 (5천 원)
-                result_messages.append(f"💰 `{idx}번`: `{sorted(ticket)}` → **4등 (5,000원)** 🎊")
-            else:
-                result_messages.append(f"❌ `{idx}번`: `{sorted(ticket)}` → **꽝**")
-
+            prize = {6: 100000000, 5: 5000000, 4: 500000, 3: 5000}.get(matched, 0)
             total_prize += prize
+
+            result_messages.append(f"🎟 `{idx}번`: `{ticket}` → `{matched}개 일치` {'🎉 당첨!' if prize > 0 else '❌ 꽝'}")
 
         if total_prize > 0:
             self.db.users.update_one({"_id": user_id}, {"$inc": {"money": total_prize}})
@@ -150,6 +130,29 @@ class Lotto(commands.Cog):
         await ctx.send("📜 **이번 주 복권 번호 목록**\n" + "\n".join(ticket_messages) +
                        "\n\n🎯 **당첨 결과:**\n" + "\n".join(result_messages) +
                        f"\n\n💰 **총 당첨 금액:** {total_prize:,}원")
+
+    @tasks.loop(hours=1)  # 1시간마다 실행하여 일요일 21시 감지
+    async def lotto_draw_task(self):
+        """매주 일요일 21:00 자동 추첨"""
+        now = self.get_seoul_time()
+        if now.weekday() == 6 and now.hour == 21:
+            current_week = now.strftime("%Y-%W")
+            winning_numbers = sorted(random.sample(range(1, 46), 6))
+
+            self.db.lotto_result.update_one(
+                {"week": current_week},
+                {"$set": {"numbers": winning_numbers}},
+                upsert=True
+            )
+
+            channel = self.bot.get_channel(YOUR_CHANNEL_ID)  # 결과 발표 채널 ID 설정
+            if channel:
+                await channel.send(f"🎉 이번 주 복권 당첨 번호: `{' '.join(map(str, winning_numbers))}`")
+
+    @lotto_draw_task.before_loop
+    async def before_lotto_draw(self):
+        """봇이 실행되기 전에 태스크 실행을 방지"""
+        await self.bot.wait_until_ready()
 
 async def setup(bot):
     await bot.add_cog(Lotto(bot))

@@ -38,7 +38,7 @@ class Roulette(commands.Cog):
         self.mongo_client = MongoClient(MONGO_URI)
         self.db = self.mongo_client[DB_NAME]
 
-    @commands.command(name="룰렛")
+    @commands.command(name="룰렛",aliases=["슬롯"])
     async def roulette(self, ctx, bet: str):
         """
         #룰렛 [금액/다/전부/올인]:

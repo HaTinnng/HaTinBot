@@ -41,7 +41,7 @@ class DrawOdds(commands.Cog):
             ("빈 병", 6.375)
         ]
     
-    @commands.command(name="뽑기확률")
+    @commands.command(name="뽑기확률", aliases=["가챠확률"])
     async def show_draw_odds(self, ctx):
         """
         뽑기 확률을 보여주는 명령어입니다.

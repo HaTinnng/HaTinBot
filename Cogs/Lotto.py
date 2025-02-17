@@ -26,6 +26,13 @@ class Lotto(commands.Cog):
     def get_seoul_time(self):
         return datetime.now(pytz.timezone("Asia/Seoul"))
 
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """봇이 준비되면 태스크 시작"""
+        if not self.lotto_draw_task:
+            self.lotto_draw_task = self.lotto_draw_task_func()
+            self.lotto_draw_task.start()
+
     @commands.command(name="복권구매")
     async def buy_lotto(self, ctx, ticket_count: int):
         """

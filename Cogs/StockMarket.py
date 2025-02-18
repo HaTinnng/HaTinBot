@@ -178,7 +178,7 @@ def init_stocks():
         "listed": True,
         "history": []
     }
-     stocks["16"] = {
+    stocks["16"] = {
         "_id": "16",
         "name": "백만통신",
         "price": random.randint(1000000, 1000001),
@@ -187,7 +187,7 @@ def init_stocks():
         "listed": True,
         "history": []
     }
-     stocks["17"] = {
+    stocks["17"] = {
         "_id": "17",
         "name": "베스트보험",
         "price": random.randint(10000, 10001),
@@ -196,7 +196,7 @@ def init_stocks():
         "listed": True,
         "history": []
     }
-     stocks["18"] = {
+    stocks["18"] = {
         "_id": "18",
         "name": "후니마트",
         "price": random.randint(1500000, 1500001),
@@ -260,24 +260,18 @@ class StockMarket(commands.Cog):
     def is_trading_open(self):
         """
         거래 가능 여부를 결정합니다.
-        매월 1일 00:10부터 3일 00:10 전까지는 거래 중단.
-        그 외에는 거래 가능.
+        거래는 매월 1일 0시 10분부터 26일 0시 10분까지 진행됩니다.
+        그 외의 시간에는 거래가 중단됩니다.
         """
+        
         now = self.get_seoul_time()
-        if now.day == 1:
-            if now.hour == 0 and now.minute < 10:
-                return True
-            else:
-                return False
-        elif now.day == 2:
-            return False
-        elif now.day == 3:
-            if now.hour == 0 and now.minute < 10:
-                return False
-            else:
-                return True
-        else:
-            return True
+        tz = pytz.timezone("Asia/Seoul")
+        # 현재 달의 시즌 시작 및 종료 시각 (0시 10분 기준)
+        season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
+        season_end = tz.localize(datetime(year=now.year, month=now.month, day=26, hour=0, minute=10, second=0))
+        # 현재 시각이 시즌 기간 내에 있으면 거래 가능
+        return season_start <= now < season_end
+
 
     def get_next_update_info(self):
         """다음 주식 변동 시각과 남은 시간을 계산하여 반환합니다."""
@@ -350,20 +344,21 @@ class StockMarket(commands.Cog):
     @tasks.loop(minutes=1)
     async def season_reset_loop(self):
         """
-        매 분마다 현재 시간을 확인하여, 매월 1일 00:10에 시즌 종료 및 초기화 처리를 진행합니다.
+        매 분마다 현재 시간을 확인하여, 매월 26일 0시 10분에 시즌 종료 및 초기화 처리를 진행합니다.
         시즌 종료 시 모든 유저의 자산을 산출하여 상위 3명에게 칭호를 부여한 후,
-        모든 유저의 잔액과 포트폴리오를 초기화(기본금은 800,000원)하고 주식 데이터를 새로 초기화합니다.
+        모든 유저의 잔액과 포트폴리오를 초기화(기본금은 750,000원)하고 주식 데이터를 새로 초기화합니다.
         """
         now = self.get_seoul_time()
-        if now.day == 1 and now.hour == 0 and now.minute == 10:
+        if now.day == 26 and now.hour == 0 and now.minute == 10:
             if self.last_reset_month != (now.year, now.month):
                 await self.process_season_end(now)
                 self.last_reset_month = (now.year, now.month)
 
+
     @tasks.loop(minutes=1)
     async def trading_resume_loop(self):
         """
-        매 분마다 거래 가능 여부를 확인하여, 매월 3일 00:10에 거래 재개(업데이트 minute 초기화 등)를 처리합니다.
+        매 분마다 거래 가능 여부를 확인하여, 매월 1일 00:10에 거래 재개(업데이트 minute 초기화 등)를 처리합니다.
         """
         current_status = self.is_trading_open()
         if current_status and not self._last_trading_status:
@@ -374,7 +369,7 @@ class StockMarket(commands.Cog):
         """
         시즌 종료 시 모든 유저의 자산(현금 + 보유 주식 평가액)을 산출하여 상위 3명에게
         칭호("YYYY 시즌N TOP{순위}")를 부여한 후, 유저 자산과 주식 데이터를 초기화합니다.
-        또한, 시즌 종료 시 TOP3 기록을 season_results 컬렉션에 저장합니다.
+        또한, 시즌 종료 시 TOP3 기록과 함께 시즌 진행 기간을 season_results 컬렉션에 저장합니다.
         """
         ranking = []
         for user in self.db.users.find({}):
@@ -389,9 +384,16 @@ class StockMarket(commands.Cog):
         season = self.db.season.find_one({"_id": "season"})
         season_name = f"{season['year']} 시즌{season['season_no']}"
 
-        # TOP3 기록을 season_results 컬렉션에 저장
+        # 시즌 진행 기간: 이번 달 1일 0시 10분 ~ 26일 0시 10분 (한국 시간 기준)
+        tz = pytz.timezone("Asia/Seoul")
+        season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
+        season_end = tz.localize(datetime(year=now.year, month=now.month, day=26, hour=0, minute=10, second=0))
+
+        # 시즌 결과 기록 문서에 진행 기간 추가
         season_result_doc = {
             "season_name": season_name,
+            "start_time": season_start.strftime("%Y-%m-%d %H:%M:%S"),
+            "end_time": season_end.strftime("%Y-%m-%d %H:%M:%S"),
             "results": []
         }
         for idx, (user_id, total_assets) in enumerate(ranking[:3], start=1):
@@ -425,6 +427,7 @@ class StockMarket(commands.Cog):
             {"_id": "season"},
             {"$inc": {"season_no": 1}, "$set": {"last_reset": now.strftime("%Y-%m-%d %H:%M:%S")}}
         )
+
 
     # ===== 명령어들 =====
 
@@ -757,30 +760,42 @@ class StockMarket(commands.Cog):
     async def season_info(self, ctx):
         """
         #시즌:
-        현재 시즌명과 시즌 종료 시각(다음 달 1일 00:10:00, 한국시간 기준), 남은 시간을 보여줍니다.
+        현재 시즌명과 시즌 진행 기간(시작: 매월 1일 0시 10분, 종료: 매월 26일 0시 10분),
+        남은 시간(현재 시즌 종료까지 또는 다음 시즌 시작까지)을 보여줍니다.
         """
         season = self.db.season.find_one({"_id": "season"})
         season_name = f"{season['year']} 시즌{season['season_no']}"
         now = self.get_seoul_time()
         tz = pytz.timezone("Asia/Seoul")
-        if now.month == 12:
-            next_year = now.year + 1
-            next_month = 1
+        
+        if now.day < 26:
+            # 현재 시즌 진행 중: 이번 달 1일 ~ 26일
+            season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
+            season_end = tz.localize(datetime(year=now.year, month=now.month, day=26, hour=0, minute=10, second=0))
+            remaining = season_end - now
         else:
-            next_year = now.year
-            next_month = now.month + 1
-        season_end = tz.localize(datetime(year=next_year, month=next_month, day=1, hour=0, minute=10, second=0))
-        remaining = season_end - now
+            # 시즌 종료 후: 다음 시즌 시작 정보를 표시
+            if now.month == 12:
+                next_year = now.year + 1
+                next_month = 1
+            else:
+                next_year = now.year
+                next_month = now.month + 1
+            season_start = tz.localize(datetime(year=next_year, month=next_month, day=1, hour=0, minute=10, second=0))
+            season_end = tz.localize(datetime(year=next_year, month=next_month, day=26, hour=0, minute=10, second=0))
+            remaining = season_start - now
+
         days = remaining.days
-        hours, remainder = divmod(remaining.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
+        hours, rem = divmod(remaining.seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
         remaining_str = f"{days}일 {hours}시간 {minutes}분 {seconds}초"
     
         await ctx.send(
             f"현재 시즌: **{season_name}**\n"
-            f"시즌 종료 시각: {season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"시즌 기간: {season_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"남은 시간: {remaining_str}"
         )
+
 
     @commands.command(name="변동내역")
     async def price_history(self, ctx, stock_name: str):
@@ -1138,9 +1153,10 @@ class StockMarket(commands.Cog):
     async def season_results(self, ctx, *, season_name: str = None):
         """
         #시즌결과:
-        - 인자 없이 실행하면 기록된 모든 시즌명을 나열합니다.
+        - 인자 없이 실행하면 기록된 모든 시즌명을 나열하며, 각 시즌의 시작 날짜와 종료 날짜를 보여줍니다.
           (기록된 시즌이 10개 이상일 경우 페이지네이션을 지원합니다.)
-        - 시즌명을 함께 입력하면 해당 시즌의 TOP3 (닉네임, 최종 보유 자금) 결과를 보여줍니다.
+        - 시즌명을 함께 입력하면 해당 시즌의 TOP3 (닉네임, 최종 보유 자금) 결과와
+          시즌 진행 기간(시작 날짜 ~ 종료 날짜)을 보여줍니다.
         """
         if season_name is not None:
             # 특정 시즌의 결과 조회
@@ -1152,7 +1168,11 @@ class StockMarket(commands.Cog):
             if not results:
                 await ctx.send(f"'{season_name}' 시즌 결과가 없습니다.")
                 return
-            lines = [f"**{season_name} 시즌 TOP3 결과**"]
+            # 시즌 진행 기간도 함께 표시
+            lines = [
+                f"**{season_name} 시즌 TOP3 결과**",
+                f"기간: {season_doc.get('start_time', 'N/A')} ~ {season_doc.get('end_time', 'N/A')}"
+            ]
             for entry in results:
                 lines.append(f"{entry['rank']}위: {entry['username']} - {entry['total_assets']}원")
             await ctx.send("\n".join(lines))
@@ -1163,13 +1183,16 @@ class StockMarket(commands.Cog):
                 await ctx.send("아직 기록된 시즌 결과가 없습니다.")
                 return
 
-            # 시즌 이름을 정렬 (예: "2023 시즌1", "2023 시즌2" 등)
+            # 시즌 기록 정렬 (예: "2023 시즌1", "2023 시즌2" 등)
             seasons.sort(key=lambda doc: doc["season_name"])
 
+            # 만약 시즌 기록이 10개 미만이면 단순 목록으로 표시
             if len(seasons) < 10:
-                season_names = [doc["season_name"] for doc in seasons]
-                season_list_str = "\n".join(season_names)
-                await ctx.send(f"기록된 시즌 결과 목록:\n{season_list_str}")
+                lines = [
+                    f"{doc['season_name']}: {doc.get('start_time', 'N/A')} ~ {doc.get('end_time', 'N/A')}"
+                    for doc in seasons
+                ]
+                await ctx.send("기록된 시즌 결과 목록:\n" + "\n".join(lines))
             else:
                 # 페이지당 10개씩 표시하도록 함
                 items_per_page = 10
@@ -1186,10 +1209,9 @@ class StockMarket(commands.Cog):
                         self.update_buttons()
 
                     def update_buttons(self):
-                        # 기존 버튼들 제거 후 재추가
                         self.clear_items()
                         self.add_item(PrevButton(self))
-                        # 가운데는 현재 페이지 표시 (클릭 불가)
+                        # 가운데 버튼은 현재 페이지 표시 (클릭 불가)
                         self.add_item(discord.ui.Button(label=f"{self.current_page+1}/{self.total_pages}", style=discord.ButtonStyle.secondary, disabled=True))
                         self.add_item(NextButton(self))
 
@@ -1197,7 +1219,10 @@ class StockMarket(commands.Cog):
                         start = self.current_page * self.items_per_page
                         end = start + self.items_per_page
                         page_seasons = self.seasons[start:end]
-                        lines = [f"{idx+1}. {doc['season_name']}" for idx, doc in enumerate(page_seasons, start=start)]
+                        lines = [
+                            f"{idx+1}. {doc['season_name']}: {doc.get('start_time', 'N/A')} ~ {doc.get('end_time', 'N/A')}"
+                            for idx, doc in enumerate(page_seasons, start=start)
+                        ]
                         return "\n".join(lines)
 
                 class PrevButton(discord.ui.Button):

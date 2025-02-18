@@ -947,6 +947,71 @@ class StockMarket(commands.Cog):
         """관리자가 아닌 사용자가 명령어를 사용할 경우 오류 메시지 출력"""
         if isinstance(error, commands.MissingPermissions):
             await ctx.send("❌ 이 명령어는 관리자만 사용할 수 있습니다.")
+    
+    @commands.command(name="주식종목초기화")
+    @commands.is_owner()
+    async def reset_stock_items(self, ctx):
+        """
+        #주식종목초기화 (봇 소유자 전용):
+        모든 유저의 보유 주식을 제거하고, 모든 주식 종목을 초기 시작 주가로 복구합니다.
+        (유저 데이터는 유지하며, 보유 주식과 주가만 초기화됩니다.)
+        """
+        # 내부에서 사용할 View 정의 (30초 타임아웃)
+        class ConfirmResetView(discord.ui.View):
+            def __init__(self, timeout=30):
+                super().__init__(timeout=timeout)
+                self.value = None  # 사용자가 어떤 버튼을 눌렀는지 저장 (True: 계속, False: 취소)
+
+            @discord.ui.button(label="계속하기", style=discord.ButtonStyle.danger)
+            async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+                # 명령어를 실행한 사용자만 상호작용 가능하도록 체크
+                if interaction.user.id != ctx.author.id:
+                    await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+                    return
+                self.value = True
+                self.stop()
+                await interaction.response.send_message("초기화를 진행합니다...", ephemeral=True)
+
+            @discord.ui.button(label="그만두기", style=discord.ButtonStyle.secondary)
+            async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+                if interaction.user.id != ctx.author.id:
+                    await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+                    return
+                self.value = False
+                self.stop()
+                await interaction.response.send_message("초기화가 취소되었습니다.", ephemeral=True)
+
+        warning_message = (
+            "⚠️ **경고: 주식종목초기화를 진행하면 모든 유저의 보유 주식이 제거되고, "
+            "모든 주식 종목이 초기 시작 주가로 복구됩니다. 이 작업은 되돌릴 수 없습니다.**\n"
+            "계속하시겠습니까?"
+        )
+
+        view = ConfirmResetView(timeout=30)
+        await ctx.send(warning_message, view=view)
+
+        # 버튼 응답을 30초 동안 대기
+        await view.wait()
+
+        if view.value is None:
+            await ctx.send("시간 초과로 초기화가 취소되었습니다.")
+            return
+
+        if not view.value:
+            await ctx.send("초기화가 취소되었습니다.")
+            return
+
+        # 초기화 진행: 유저의 보유 주식(포트폴리) 제거
+        self.db.users.update_many({}, {"$set": {"portfolio": {}}})
+
+        # 주식 데이터 초기화 (상장폐지된 종목 포함 모두 초기 상태로 복구)
+        self.db.stocks.delete_many({})
+        stocks = init_stocks()
+        for stock in stocks.values():
+            self.db.stocks.insert_one(stock)
+
+        await ctx.send("✅ 모든 주식 종목이 초기화되었습니다. 모든 유저의 보유 주식이 제거되었습니다.")
+
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

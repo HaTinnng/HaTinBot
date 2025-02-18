@@ -390,6 +390,18 @@ class StockMarket(commands.Cog):
         if not username:
             await ctx.send("경고: 주식 게임에 참가하려면 반드시 이름을 입력해야 합니다. 예: `#주식참가 홍길동`")
             return
+
+        # 앞뒤 공백 제거 후 빈 문자열 체크
+        username = username.strip()
+        if not username:
+            await ctx.send("경고: 올바른 닉네임을 입력해주세요. (공백만 입력할 수 없습니다.)")
+            return
+
+        # 중복 닉네임 체크 (이미 사용 중인 닉네임이면 참가 불가)
+        if self.db.users.find_one({"username": username}):
+            await ctx.send("경고: 이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요.")
+            return
+
         user_id = str(ctx.author.id)
         if self.db.users.find_one({"_id": user_id}):
             await ctx.send("이미 주식 게임에 참가하셨습니다.")
@@ -1011,7 +1023,40 @@ class StockMarket(commands.Cog):
             self.db.stocks.insert_one(stock)
 
         await ctx.send("✅ 모든 주식 종목이 초기화되었습니다. 모든 유저의 보유 주식이 제거되었습니다.")
-
+    
+    @commands.command(name="칭호지급")
+    @commands.is_owner()
+    async def award_title(self, ctx, target: str, *, title: str):
+        """
+        #칭호지급 [유저ID 또는 다] [칭호명]:
+        봇 소유자 전용 명령어입니다.
+        - 특정 유저의 ID를 입력하면 해당 유저에게 칭호를 부여합니다.
+        - "다"를 입력하면 현재 주식 게임에 참가한 모든 유저에게 칭호를 부여합니다.
+        단, 해당 유저가 이미 동일한 칭호를 보유 중이면 지급되지 않습니다.
+        """
+        if target == "다":
+            # 전체 유저 중 아직 해당 칭호가 없는 유저들만 업데이트
+            result = self.db.users.update_many(
+                {"titles": {"$ne": title}},
+                {"$addToSet": {"titles": title}}
+            )
+            if result.modified_count > 0:
+                await ctx.send(f"총 {result.modified_count}명의 유저에게 '{title}' 칭호가 부여되었습니다.")
+            else:
+                await ctx.send("모든 유저가 이미 해당 칭호를 보유하고 있습니다.")
+        else:
+            user = self.db.users.find_one({"_id": target})
+            if not user:
+                await ctx.send("해당 유저는 주식 게임에 등록되어 있지 않습니다.")
+                return
+            if title in user.get("titles", []):
+                await ctx.send("해당 유저는 이미 이 칭호를 보유하고 있습니다.")
+                return
+            self.db.users.update_one(
+                {"_id": target},
+                {"$addToSet": {"titles": title}}
+            )
+            await ctx.send(f"유저 `{target}`에게 '{title}' 칭호가 부여되었습니다.")
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

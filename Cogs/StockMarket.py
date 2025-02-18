@@ -892,32 +892,55 @@ class StockMarket(commands.Cog):
         await ctx.send(f"✅ 새로운 주식 `{stock_name}`이 추가되었습니다! 초기 가격: {new_stock['price']}원")
 
     @commands.command(name="주식쿠폰입력")
-    @commands.has_permissions(administrator=True)  # 관리자 이상만 사용 가능
     async def redeem_stock_coupon(self, ctx, coupon_code: str):
         """
         #주식쿠폰입력 [쿠폰코드]:
-        올바른 쿠폰 코드를 입력하면 200,000원을 추가 지급합니다.
-        (쿠폰 입력 제한 없음)
+        올바른 쿠폰 코드를 입력하면 해당 쿠폰의 지급 금액을 추가 지급합니다.
+        각 유저는 각 쿠폰을 최대 설정한 횟수만큼 사용할 수 있습니다.
         """
-        VALID_COUPON = "jg2131da21809"  # 사용 가능한 쿠폰 코드
-        REWARD_AMOUNT = 400000  # 지급 금액
-        
+        # 여러 쿠폰을 딕셔너리로 관리합니다.
+        # 각 쿠폰 코드는 지급 금액과 최대 사용 횟수를 포함합니다.
+        valid_coupons = {
+            "2025Season1": {"reward": 300000, "max_usage": 1},
+            # "": {"reward": 200000, "max_usage": 2} 다음 원하는 거 추가
+        }
+
+        if coupon_code not in valid_coupons:
+            await ctx.send("❌ 유효하지 않은 쿠폰 코드입니다. 다시 확인해주세요.")
+            return
+
+        coupon_data = valid_coupons[coupon_code]
+        reward_amount = coupon_data["reward"]
+        max_coupon_usage = coupon_data["max_usage"]
+
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
-        
         if not user:
             await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가` 명령어로 참가해주세요.")
             return
 
-        if coupon_code != VALID_COUPON:
-            await ctx.send("❌ 유효하지 않은 쿠폰 코드입니다. 다시 확인해주세요.")
+        # 유저별 쿠폰 사용 기록을 "coupon_redemptions" 필드로 관리합니다.
+        coupon_usage = user.get("coupon_redemptions", {})
+        current_usage = coupon_usage.get(coupon_code, 0)
+
+        if current_usage >= max_coupon_usage:
+            await ctx.send("❌ 이미 최대 사용 횟수만큼 쿠폰을 사용하셨습니다.")
             return
 
-        # 쿠폰 적용 (제한 없이 계속 사용 가능)
-        new_money = user.get("money", 0) + REWARD_AMOUNT
-        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money}})
-        await ctx.send(f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{REWARD_AMOUNT}원`을 지급받았습니다.\n"
-                       f"현재 잔액: `{new_money}원`")
+        new_money = user.get("money", 0) + reward_amount
+        coupon_usage[coupon_code] = current_usage + 1
+
+        self.db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"money": new_money, "coupon_redemptions": coupon_usage}}
+        )
+
+        await ctx.send(
+            f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{reward_amount}원`을 지급받았습니다.\n"
+            f"현재 잔액: `{new_money}원`\n"
+            f"이 쿠폰은 총 {max_coupon_usage}회 사용 가능하며, 현재 사용 횟수: {coupon_usage[coupon_code]}회"
+        )
+
 
     @commands.command(name="유저정보", aliases=["유저조회"])
     @commands.has_permissions(administrator=True)  # 관리자 권한 필요

@@ -26,7 +26,7 @@ class SlotPayoutInfo(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
-    @commands.command(name="슬롯정보")
+    @commands.command(name="슬롯정보",aliases=["룰렛정보"])
     async def payout_info(self, ctx):
         """ 슬롯머신 배당 정보를 보여줍니다. """
         embed = discord.Embed(title="🎰 슬롯머신 배당 정보", color=discord.Color.gold())

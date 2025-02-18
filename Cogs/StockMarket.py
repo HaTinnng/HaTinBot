@@ -8,7 +8,7 @@ from pymongo import MongoClient
 
 # ===== 상수 설정 =====
 JOIN_BONUS = 800000         # 참가 시 지급 자금 (800,000원)
-DEFAULT_MONEY = 800000      # 시즌 초기화 후 유저 기본 잔액 (800,000원)
+DEFAULT_MONEY = 750000      # 시즌 초기화 후 유저 기본 잔액 (800,000원)
 SUPPORT_AMOUNT = 50000  # 지원금 5만원
 # MongoDB URI는 클라우드에서 비밀변수 MONGODB_URI를 통해 불러옵니다.
 MONGO_URI = os.environ.get("MONGODB_URI")
@@ -18,24 +18,24 @@ DB_NAME = "stock_game"
 def init_stocks():
     """
     17개의 주식을 아래와 같이 초기화합니다.
-      - "311유통": 100
-      - "썬더타이어": 500 ~ 1000
-      - "룡치수산": 3000 ~ 5000
-      - "맥턴맥주": 7000 ~ 8000
-      - "섹보경아트": 9000 ~ 12000
-      - "전차자동차": 18000 ~ 25000
-      - "이리여행사": 33000 ~ 42000
-      - "디코커피": 50000 ~ 60000
-      - "와이제이엔터": 75000 ~ 90000
-      - "파피게임사": 120000 ~ 150000
-      - "하틴봇전자": 170000 ~ 210000
-      - "하틴출판사": 240000 ~ 270000
-      - "창훈버거": 300000 ~ 330000
-      - "끼룩제약": 375000 (약간의 오차 허용)
-      - "날틀식품": 420000 ~ 450000
-      - "오십만통신": 500000
-      - "베스트보험": 150
-      - "후니마트": 750000
+      - "311유통": 1500
+      - "썬더타이어": 3500 ~ 5000
+      - "룡치수산": 9000 ~ 12000
+      - "맥턴맥주": 18000 ~ 30000
+      - "섹보경아트": 45000 ~ 50000
+      - "전차자동차": 70000 ~ 80000
+      - "이리여행사": 100000
+      - "디코커피": 125000 ~ 145000
+      - "와이제이엔터": 185000 ~ 200000
+      - "파피게임사": 250000 ~ 300000
+      - "하틴봇전자": 380000 ~ 400000
+      - "하틴출판사": 525000 ~ 550000
+      - "창훈버거": 675000 ~ 700000
+      - "끼룩제약": 827500
+      - "날틀식품": 950000
+      - "백만통신": 1000000
+      - "베스트보험": 10000
+      - "후니마트": 1500000
 
     각 종목은 추가적으로 아래 필드를 가집니다.
       - last_change, percent_change: 최근 가격 변동 내역
@@ -46,7 +46,7 @@ def init_stocks():
     stocks["1"] = {
         "_id": "1",
         "name": "311유통",
-        "price": random.randint(99, 100),
+        "price": random.randint(1500, 1501),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -55,7 +55,7 @@ def init_stocks():
     stocks["2"] = {
         "_id": "2",
         "name": "썬더타이어",
-        "price": random.randint(500, 1000),
+        "price": random.randint(3500, 5000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -64,7 +64,7 @@ def init_stocks():
     stocks["3"] = {
         "_id": "3",
         "name": "룡치수산",
-        "price": random.randint(3000, 5000),
+        "price": random.randint(9000, 12000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -73,7 +73,7 @@ def init_stocks():
     stocks["4"] = {
         "_id": "4",
         "name": "맥턴맥주",
-        "price": random.randint(7000, 8000),
+        "price": random.randint(18000, 30000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -82,7 +82,7 @@ def init_stocks():
     stocks["5"] = {
         "_id": "5",
         "name": "섹보경아트",
-        "price": random.randint(9000, 12000),
+        "price": random.randint(45000, 50000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -91,7 +91,7 @@ def init_stocks():
     stocks["6"] = {
         "_id": "6",
         "name": "전차자동차",
-        "price": random.randint(18000, 25000),
+        "price": random.randint(70000, 80000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -100,7 +100,7 @@ def init_stocks():
     stocks["7"] = {
         "_id": "7",
         "name": "이리여행사",
-        "price": random.randint(33000, 42000),
+        "price": random.randint(100000, 100001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -109,7 +109,7 @@ def init_stocks():
     stocks["8"] = {
         "_id": "8",
         "name": "디코커피",
-        "price": random.randint(50000, 60000),
+        "price": random.randint(125000, 145000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -118,7 +118,7 @@ def init_stocks():
     stocks["9"] = {
         "_id": "9",
         "name": "와이제이엔터",
-        "price": random.randint(75000, 90000),
+        "price": random.randint(185000, 200000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -127,7 +127,7 @@ def init_stocks():
     stocks["10"] = {
         "_id": "10",
         "name": "파피게임사",
-        "price": random.randint(120000, 150000),
+        "price": random.randint(250000, 300000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -136,7 +136,7 @@ def init_stocks():
     stocks["11"] = {
         "_id": "11",
         "name": "하틴봇전자",
-        "price": random.randint(170000, 210000),
+        "price": random.randint(380000, 400000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -145,7 +145,7 @@ def init_stocks():
     stocks["12"] = {
         "_id": "12",
         "name": "하틴출판사",
-        "price": random.randint(240000, 270000),
+        "price": random.randint(525000, 550000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -154,7 +154,7 @@ def init_stocks():
     stocks["13"] = {
         "_id": "13",
         "name": "창훈버거",
-        "price": random.randint(300000, 330000),
+        "price": random.randint(675000, 700000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -163,7 +163,7 @@ def init_stocks():
     stocks["14"] = {
         "_id": "14",
         "name": "끼룩제약",
-        "price": random.randint(374999, 375000),
+        "price": random.randint(827500, 827501),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -172,12 +172,39 @@ def init_stocks():
     stocks["15"] = {
         "_id": "15",
         "name": "날틀식품",
-        "price": random.randint(420000, 450000),
+        "price": random.randint(950000, 950001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
         "history": []
-    } 
+    }
+     stocks["16"] = {
+        "_id": "16",
+        "name": "백만통신",
+        "price": random.randint(1000000, 1000001),
+        "last_change": 0,
+        "percent_change": 0,
+        "listed": True,
+        "history": []
+    }
+     stocks["17"] = {
+        "_id": "17",
+        "name": "베스트보험",
+        "price": random.randint(10000, 10001),
+        "last_change": 0,
+        "percent_change": 0,
+        "listed": True,
+        "history": []
+    }
+     stocks["18"] = {
+        "_id": "18",
+        "name": "후니마트",
+        "price": random.randint(1500000, 1500001),
+        "last_change": 0,
+        "percent_change": 0,
+        "listed": True,
+        "history": []
+    }
     # 각 종목의 history에 최초 가격 추가
     for s in stocks.values():
         s["history"].append(s["price"])
@@ -267,7 +294,7 @@ class StockMarket(commands.Cog):
     
     def update_stocks(self):
         """
-        모든 주식의 가격을 ±18.58% 변동폭 내에서 변동합니다.
+        모든 주식의 가격을 19.58% ~ -16.32% 변동폭 내에서 변동합니다.
         가격이 13원 미만이 되면 상장폐지되며, 가격이 0원이 되고 변동이 중단됩니다.
         """
         if not self.is_trading_open():
@@ -281,7 +308,7 @@ class StockMarket(commands.Cog):
                 continue  # 변동을 적용하지 않음
             
             old_price = stock["price"]
-            percent_change = random.uniform(-18.58, 18.58)  # 모든 주식 동일 변동폭 적용
+            percent_change = random.uniform(-16.32, 19.58)  # 모든 주식 동일 변동폭 적용
             new_price = int(old_price * (1 + percent_change / 100))
             new_price = max(new_price, 1)
             

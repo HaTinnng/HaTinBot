@@ -938,7 +938,7 @@ class StockMarket(commands.Cog):
         await ctx.send(
             f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{reward_amount}원`을 지급받았습니다.\n"
             f"현재 잔액: `{new_money}원`\n"
-            f"이 쿠폰은 총 {max_coupon_usage}회 사용 가능하며, 현재 사용 횟수: {coupon_usage[coupon_code]}회"
+            f"이 쿠폰은 총 {max_coupon_usage}회 사용 가능하며, 현재 사용 횟수: {coupon_usage[coupon_code]}회 사용했습니다."
         )
 
 

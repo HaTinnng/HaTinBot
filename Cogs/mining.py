@@ -2,6 +2,7 @@ import discord
 import random
 import asyncio
 import time
+import re
 from discord.ext import commands
 from pymongo import MongoClient
 import os
@@ -63,7 +64,7 @@ MINES = {
             "에메랄드": {"chance": 5, "min_qty": 1, "max_qty": 1},
         }
     },
-    "특급광산": {
+    "특급급광산": {
         "req_user_level": 10,
         "req_equipment_level": 9,
         "minerals": {
@@ -161,10 +162,22 @@ SALE_PRICES = {
 }
 
 # --------------------------
+# 광물 등급 설정
+# --------------------------
+MINERAL_GRADES = {
+    "D": {"prob": 40, "xp_multiplier": 1.0, "sale_multiplier": 1.0},
+    "C": {"prob": 25, "xp_multiplier": 1.5, "sale_multiplier": 1.5},
+    "B": {"prob": 15, "xp_multiplier": 2, "sale_multiplier": 2},
+    "A": {"prob": 10, "xp_multiplier": 4, "sale_multiplier": 4},
+    "S": {"prob": 5,  "xp_multiplier": 8, "sale_multiplier": 8},
+    "X": {"prob": 3,  "xp_multiplier": 16, "sale_multiplier": 16},
+    "MAX": {"prob": 2, "xp_multiplier": 25, "sale_multiplier": 25},
+}
+
+# --------------------------
 # 장비 이름 반환 함수
 # --------------------------
 def get_equipment_name(level: int) -> str:
-    # 예시 이름 체계 (원하는 대로 수정 가능)
     if level == 1:
         return "맨손"
     elif level == 2:
@@ -205,33 +218,6 @@ def get_equipment_name(level: int) -> str:
         return f"최강의 이리듐 곡괭이 (Lv.{level})"
     else:
         return f"여래신장 (Lv.{level})"
-
-# --------------------------
-# Confirm View for 완전 초기화
-# --------------------------
-class ResetConfirmView(discord.ui.View):
-    def __init__(self, author: discord.User, timeout=30):
-        super().__init__(timeout=timeout)
-        self.author = author
-        self.value = None
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author.id:
-            await interaction.response.send_message("이 명령어는 봇 소유자만 사용할 수 있습니다.", ephemeral=True)
-            return False
-        return True
-
-    @discord.ui.button(label="동의", style=discord.ButtonStyle.green)
-    async def agree(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.value = True
-        self.stop()
-        await interaction.response.edit_message(content="모든 광산 데이터가 삭제됩니다.", view=None)
-
-    @discord.ui.button(label="그만두기", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.value = False
-        self.stop()
-        await interaction.response.edit_message(content="초기화가 취소되었습니다.", view=None)
 
 # --------------------------
 # MiningSystem Cog
@@ -275,7 +261,6 @@ class MiningSystem(commands.Cog):
         if not nickname:
             await ctx.send(f"{ctx.author.mention} 닉네임은 빈칸일 수 없습니다.")
             return
-        # 중복 닉네임 체크 (이미 등록된 닉네임이 있는지)
         if self.db.mining_users.find_one({"nickname": nickname}):
             await ctx.send(f"{ctx.author.mention} 이미 사용 중인 닉네임입니다. 다른 닉네임을 선택해주세요.")
             return
@@ -330,14 +315,13 @@ class MiningSystem(commands.Cog):
         """
         #광산완전초기화:
         봇 소유자 전용 명령어입니다.
-        경고: 이 명령어를 실행하면 광산 관련 모든 데이터(광산 게임 데이터)가 삭제됩니다.
+        경고: 이 명령어를 실행하면 광산 관련 모든 데이터가 삭제됩니다.
         주식 정보는 삭제되지 않습니다.
         """
         view = ResetConfirmView(ctx.author, timeout=30)
         await ctx.send("경고: 정말로 모든 광산 데이터를 삭제하시겠습니까? 주식 정보는 삭제되지 않습니다.", view=view)
         await view.wait()
         if view.value:
-            # 광산 데이터는 mining_users 컬렉션의 모든 문서를 삭제
             self.db.mining_users.delete_many({})
             await ctx.send("모든 광산 데이터가 삭제되었습니다.")
         else:
@@ -350,7 +334,7 @@ class MiningSystem(commands.Cog):
     async def mine_profile(self, ctx):
         """
         #광산프로필:
-        자신의 유저 레벨, 장비, 보유 루찌, 인벤토리 상태(사용중/총용량) 및 경험치 진행 상황을 표시합니다.
+        자신의 유저 레벨, 장비, 보유 루찌, 인벤토리 상태 및 경험치 진행 상황을 표시합니다.
         """
         user_id = str(ctx.author.id)
         profile = self.get_user_profile(user_id)
@@ -376,18 +360,19 @@ class MiningSystem(commands.Cog):
         사용자 채취 세션: 일정 주기마다 채취를 시도하며,
         인벤토리가 꽉 차거나 사용자가 중지할 때까지 진행됩니다.
         세션 데이터는 self.active_sessions에 저장됩니다.
+        광물은 한 번에 하나씩 드랍하며, 각 드랍 시 등급이 부여됩니다.
         """
         user_id = str(ctx.author.id)
         session = {
             "mine_name": mine_name,
             "start_time": time.time(),
             "total_time": 0,      # 누적 채취 시간 (초)
-            "collected": {},      # 세션 동안 획득한 광물 (dict)
+            "collected": {},      # 세션 동안 획득한 광물 (키: "광물 (등급)")
             "xp_gained": 0,
             "active": True,
             "ctx": ctx,
-            "cycle_start": None,  # 현재 사이클 시작 시각
-            "current_cycle_duration": None  # 현재 사이클의 지속 시간
+            "cycle_start": None,
+            "current_cycle_duration": None
         }
         self.active_sessions[user_id] = session
         await ctx.send(f"{ctx.author.mention} **{mine_name}** 채취 세션이 시작되었습니다!")
@@ -398,7 +383,6 @@ class MiningSystem(commands.Cog):
                 await ctx.send(f"{ctx.author.mention} 인벤토리가 꽉 차서 채취 세션을 종료합니다.")
                 session["active"] = False
                 break
-            # 모든 광산은 맨손 기준 3시간(10800초) 채취, 장비 레벨에 따라 단축됨.
             effective_time = max(int(10800 / profile["equipment_level"]), 1)
             session["cycle_start"] = time.time()
             session["current_cycle_duration"] = effective_time
@@ -407,29 +391,31 @@ class MiningSystem(commands.Cog):
             except asyncio.CancelledError:
                 break
             session["total_time"] += effective_time
-            # 모든 사이클마다 한 개의 광물만 드랍
+            # 광물은 한 번에 하나만 드랍하며, 드랍 시 등급 부여
             num_drops = 1
             drops = []
             mine = MINES[mine_name]
             for _ in range(num_drops):
                 minerals = list(mine["minerals"].keys())
                 chances = [mine["minerals"][m]["chance"] for m in minerals]
-                mineral = random.choices(minerals, weights=chances, k=1)[0]
-                qty = random.randint(mine["minerals"][mineral]["min_qty"], mine["minerals"][mineral]["max_qty"])
-                drops.append((mineral, qty))
+                base_mineral = random.choices(minerals, weights=chances, k=1)[0]
+                qty = random.randint(mine["minerals"][base_mineral]["min_qty"], mine["minerals"][base_mineral]["max_qty"])
+                grade = random.choices(list(MINERAL_GRADES.keys()), weights=[MINERAL_GRADES[g]["prob"] for g in MINERAL_GRADES], k=1)[0]
+                mineral_with_grade = f"{base_mineral} ({grade})"
+                drops.append((mineral_with_grade, qty, grade))
             available_space = profile["inventory_capacity"] - current_inventory_count
             collected_this_cycle = {}
             lost_drops = []
-            for mineral, qty in drops:
+            for mineral_with_grade, qty, grade in drops:
                 if available_space <= 0:
-                    lost_drops.append((mineral, qty))
+                    lost_drops.append((mineral_with_grade, qty))
                     continue
                 if qty <= available_space:
-                    collected_this_cycle[mineral] = collected_this_cycle.get(mineral, 0) + qty
+                    collected_this_cycle[mineral_with_grade] = collected_this_cycle.get(mineral_with_grade, 0) + qty
                     available_space -= qty
                 else:
-                    collected_this_cycle[mineral] = collected_this_cycle.get(mineral, 0) + available_space
-                    lost_drops.append((mineral, qty - available_space))
+                    collected_this_cycle[mineral_with_grade] = collected_this_cycle.get(mineral_with_grade, 0) + available_space
+                    lost_drops.append((mineral_with_grade, qty - available_space))
                     available_space = 0
             for mineral, qty in collected_this_cycle.items():
                 session["collected"][mineral] = session["collected"].get(mineral, 0) + qty
@@ -437,7 +423,14 @@ class MiningSystem(commands.Cog):
                 profile["inventory"] = {}
             for mineral, qty in collected_this_cycle.items():
                 profile["inventory"][mineral] = profile["inventory"].get(mineral, 0) + qty
-            xp_gained = random.randint(10, 25)
+            # 경험치 부여: 기본 xp 랜덤(10~25) * 등급 xp 배율 (드랍된 광물이 있으면 첫 드랍의 등급 사용)
+            base_xp = random.randint(10, 25)
+            if drops:
+                grade = drops[0][2]
+                xp_multiplier = MINERAL_GRADES[grade]["xp_multiplier"]
+            else:
+                xp_multiplier = 1.0
+            xp_gained = int(base_xp * xp_multiplier)
             profile["xp"] = profile.get("xp", 0) + xp_gained
             session["xp_gained"] += xp_gained
             while profile["xp"] >= profile.get("next_xp", 100):
@@ -446,7 +439,7 @@ class MiningSystem(commands.Cog):
                 profile["next_xp"] = 100 * (profile["level"] ** 2)
             self.update_user_profile(user_id, profile)
         if user_id in self.active_sessions:
-            finished_session = self.active_sessions.pop(user_id)
+            self.active_sessions.pop(user_id)
             await ctx.send(f"{ctx.author.mention} 채취 세션이 종료되었습니다.")
     
     # --------------------------
@@ -528,7 +521,7 @@ class MiningSystem(commands.Cog):
         await ctx.send(f"{ctx.author.mention} 채취 세션이 중지되었습니다.\n{result}")
     
     # --------------------------
-    # #광산결과 명령어 (채취 세션 결과 조회, 세션 중지 아님)
+    # 광산결과 명령어 (채취 세션 결과 조회, 세션 중지 아님)
     # --------------------------
     @commands.command(name="광산결과")
     async def mining_result(self, ctx):
@@ -550,7 +543,6 @@ class MiningSystem(commands.Cog):
         elapsed = int(time.time() - session["start_time"])
         total_hours = elapsed // 3600
         total_minutes = (elapsed % 3600) // 60
-        # 다음 광물 드랍까지 남은 시간 계산
         if session.get("cycle_start") and session.get("current_cycle_duration"):
             cycle_elapsed = time.time() - session["cycle_start"]
             remaining = max(int(session["current_cycle_duration"] - cycle_elapsed), 0)
@@ -593,36 +585,57 @@ class MiningSystem(commands.Cog):
         await ctx.send(embed=embed)
     
     # --------------------------
-    # 광물 판매 명령어
+    # 광물 판매 명령어 (등급 적용)
     # --------------------------
     @commands.command(name="광물판매")
-    async def sell_minerals(self, ctx, mineral: str, quantity: int):
+    async def sell_minerals(self, ctx, *, args: str):
         """
-        #광물판매 <광물이름> <수량>:
+        #광물판매 [광물이름] [수량]:
         보유한 광물을 판매하여 루찌를 획득합니다.
-        (판매 가격은 SALE_PRICES에 따라 계산됩니다.)
+        광물 이름에는 등급이 포함되어야 합니다. 예: "철 (S)"
+        (판매 가격은 SALE_PRICES에 등급 배율을 곱하여 계산됩니다.)
         """
+        # args를 공백으로 분리하여 마지막 값은 수량, 나머지는 광물명
+        parts = args.rsplit(" ", 1)
+        if len(parts) != 2:
+            await ctx.send(f"{ctx.author.mention} 올바른 형식으로 입력해주세요. 예: #광물판매 철 (S) 1")
+            return
+        mineral_input, quantity_str = parts
+        try:
+            quantity = int(quantity_str)
+        except ValueError:
+            await ctx.send(f"{ctx.author.mention} 수량은 정수로 입력해주세요.")
+            return
         user_id = str(ctx.author.id)
         profile = self.get_user_profile(user_id)
         if not profile:
             await ctx.send(f"{ctx.author.mention} 게임을 시작하려면 #광산시작 명령어를 사용하세요!")
             return
         inventory = profile.get("inventory", {})
-        if mineral not in inventory or inventory[mineral] < quantity:
-            await ctx.send(f"{ctx.author.mention} 보유한 {mineral} 수량이 부족합니다.")
+        if mineral_input not in inventory or inventory[mineral_input] < quantity:
+            await ctx.send(f"{ctx.author.mention} 보유한 {mineral_input} 수량이 부족합니다.")
             return
-        if mineral not in SALE_PRICES:
-            await ctx.send(f"{ctx.author.mention} {mineral}은(는) 판매할 수 없는 광물입니다.")
+        # 광물명에서 등급 분리: "기본광물 (등급)"
+        match = re.match(r"(.+?) \((.+?)\)$", mineral_input)
+        if match:
+            base_mineral = match.group(1).strip()
+            grade = match.group(2).strip()
+        else:
+            base_mineral = mineral_input
+            grade = "D"  # 기본 등급
+        if base_mineral not in SALE_PRICES:
+            await ctx.send(f"{ctx.author.mention} {base_mineral}은(는) 판매할 수 없는 광물입니다.")
             return
-        sale_price = SALE_PRICES[mineral]
-        total_earnings = sale_price * quantity
-        inventory[mineral] -= quantity
-        if inventory[mineral] <= 0:
-            del inventory[mineral]
+        multiplier = MINERAL_GRADES.get(grade, {"sale_multiplier": 1.0})["sale_multiplier"]
+        unit_price = SALE_PRICES[base_mineral] * multiplier
+        total_earnings = int(unit_price * quantity)
+        inventory[mineral_input] -= quantity
+        if inventory[mineral_input] <= 0:
+            del inventory[mineral_input]
         profile["inventory"] = inventory
         profile["루찌"] = profile.get("루찌", 0) + total_earnings
         self.update_user_profile(user_id, profile)
-        await ctx.send(f"{ctx.author.mention} {mineral} {quantity}개를 판매하여 {total_earnings} 루찌를 획득했습니다.")
+        await ctx.send(f"{ctx.author.mention} {mineral_input} {quantity}개를 판매하여 {total_earnings} 루찌를 획득했습니다.")
     
     # --------------------------
     # 장비 강화 명령어 (광물 요구사항 제거, 최대 Lv.20, 하락 확률 적용)
@@ -631,7 +644,7 @@ class MiningSystem(commands.Cog):
     async def upgrade_equipment(self, ctx):
         """
         #장비강화:
-        현재 장비(맨손)의 강화를 시도합니다.
+        현재 장비의 강화를 시도합니다.
         - 현재 장비 레벨에 따라 필요한 루찌와 강화 성공 확률이 표시됩니다.
         - 강화는 확률에 따라 성공하며, 최대 Lv.20까지 가능합니다.
         - 장비 레벨 11 이상부터 강화 실패 시 하락 확률이 발생합니다.
@@ -650,7 +663,7 @@ class MiningSystem(commands.Cog):
         req_lucy, success_rate = self.get_equipment_upgrade_requirements(current_level)
         req_str = f"**요구 루찌:** {req_lucy}\n"
         req_str += f"**강화 성공 확률:** {success_rate}%\n"
-        req_str += f"(※ 필요 광물은 없습니다.)"
+        req_str += "(※ 필요 광물은 없습니다.)"
         embed = discord.Embed(title="장비 강화 요구 사항", description=req_str, color=discord.Color.purple())
         await ctx.send(embed=embed)
         if profile.get("루찌", 0) < req_lucy:

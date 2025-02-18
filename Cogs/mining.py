@@ -169,9 +169,9 @@ MINERAL_GRADES = {
     "C": {"prob": 25, "xp_multiplier": 1.5, "sale_multiplier": 1.5},
     "B": {"prob": 15, "xp_multiplier": 2, "sale_multiplier": 2},
     "A": {"prob": 10, "xp_multiplier": 4, "sale_multiplier": 4},
-    "S": {"prob": 5,  "xp_multiplier": 8, "sale_multiplier": 8},
-    "X": {"prob": 3,  "xp_multiplier": 16, "sale_multiplier": 16},
-    "MAX": {"prob": 2, "xp_multiplier": 25, "sale_multiplier": 25},
+    "S": {"prob": 5,  "xp_multiplier": 10, "sale_multiplier": 10},
+    "X": {"prob": 3,  "xp_multiplier": 18, "sale_multiplier": 18},
+    "MAX": {"prob": 2, "xp_multiplier": 27, "sale_multiplier": 27},
 }
 
 # --------------------------
@@ -217,7 +217,34 @@ def get_equipment_name(level: int) -> str:
     elif level == 19:
         return f"최강의 이리듐 곡괭이 (Lv.{level})"
     else:
-        return f"여래신장 (Lv.{level})"
+        return f"갤럭시 곡괭이 (Lv.{level})"
+
+# --------------------------
+# Confirm View for 완전 초기화
+# --------------------------
+class ResetConfirmView(discord.ui.View):
+    def __init__(self, author: discord.User, timeout=30):
+        super().__init__(timeout=timeout)
+        self.author = author
+        self.value = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("이 명령어는 봇 소유자만 사용할 수 있습니다.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="동의", style=discord.ButtonStyle.green)
+    async def agree(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        self.stop()
+        await interaction.response.edit_message(content="모든 광산 데이터가 삭제됩니다.", view=None)
+
+    @discord.ui.button(label="그만두기", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        self.stop()
+        await interaction.response.edit_message(content="초기화가 취소되었습니다.", view=None)
 
 # --------------------------
 # MiningSystem Cog
@@ -391,7 +418,7 @@ class MiningSystem(commands.Cog):
             except asyncio.CancelledError:
                 break
             session["total_time"] += effective_time
-            # 광물은 한 번에 하나만 드랍하며, 드랍 시 등급 부여
+            # 광물은 한 번에 하나만 드랍하며, 등급 부여
             num_drops = 1
             drops = []
             mine = MINES[mine_name]
@@ -423,7 +450,7 @@ class MiningSystem(commands.Cog):
                 profile["inventory"] = {}
             for mineral, qty in collected_this_cycle.items():
                 profile["inventory"][mineral] = profile["inventory"].get(mineral, 0) + qty
-            # 경험치 부여: 기본 xp 랜덤(10~25) * 등급 xp 배율 (드랍된 광물이 있으면 첫 드랍의 등급 사용)
+            # 경험치 부여: 기본 xp (랜덤 10~25) * 등급 xp 배율 (첫 드랍의 등급 사용)
             base_xp = random.randint(10, 25)
             if drops:
                 grade = drops[0][2]
@@ -585,7 +612,7 @@ class MiningSystem(commands.Cog):
         await ctx.send(embed=embed)
     
     # --------------------------
-    # 광물 판매 명령어 (등급 적용)
+    # 광물 판매 명령어 (등급 적용, 전체 판매 지원)
     # --------------------------
     @commands.command(name="광물판매")
     async def sell_minerals(self, ctx, *, args: str):
@@ -593,9 +620,44 @@ class MiningSystem(commands.Cog):
         #광물판매 [광물이름] [수량]:
         보유한 광물을 판매하여 루찌를 획득합니다.
         광물 이름에는 등급이 포함되어야 합니다. 예: "철 (S)"
-        (판매 가격은 SALE_PRICES에 등급 배율을 곱하여 계산됩니다.)
+        만약 [수량] 자리에 "다" 또는 "전부"를 입력하면 해당 광물을 인벤토리에서 전부 판매합니다.
+        (판매 가격은 SALE_PRICES에 등급 판매 배율을 곱하여 계산됩니다.)
         """
-        # args를 공백으로 분리하여 마지막 값은 수량, 나머지는 광물명
+        args = args.strip()
+        user_id = str(ctx.author.id)
+        profile = self.get_user_profile(user_id)
+        if not profile:
+            await ctx.send(f"{ctx.author.mention} 게임을 시작하려면 #광산시작 명령어를 사용하세요!")
+            return
+        
+        # 만약 전체 판매를 원할 경우 (예: "#광물판매 다")
+        if args in ["다", "전부"]:
+            inventory = profile.get("inventory", {})
+            if not inventory:
+                await ctx.send(f"{ctx.author.mention} 인벤토리가 비어 있습니다.")
+                return
+            total_earnings = 0
+            for mineral, qty in list(inventory.items()):
+                match = re.match(r"(.+?) \((.+?)\)$", mineral)
+                if match:
+                    base_mineral = match.group(1).strip()
+                    grade = match.group(2).strip()
+                else:
+                    base_mineral = mineral
+                    grade = "D"
+                if base_mineral not in SALE_PRICES:
+                    continue
+                multiplier = MINERAL_GRADES.get(grade, {"sale_multiplier": 1.0})["sale_multiplier"]
+                unit_price = SALE_PRICES[base_mineral] * multiplier
+                total_earnings += int(unit_price * qty)
+                del inventory[mineral]
+            profile["inventory"] = inventory
+            profile["루찌"] = profile.get("루찌", 0) + total_earnings
+            self.update_user_profile(user_id, profile)
+            await ctx.send(f"{ctx.author.mention} 인벤토리 내 모든 광물을 판매하여 {total_earnings} 루찌를 획득했습니다.")
+            return
+        
+        # 기본 판매: "#광물판매 [광물이름] [수량]"
         parts = args.rsplit(" ", 1)
         if len(parts) != 2:
             await ctx.send(f"{ctx.author.mention} 올바른 형식으로 입력해주세요. 예: #광물판매 철 (S) 1")
@@ -606,23 +668,17 @@ class MiningSystem(commands.Cog):
         except ValueError:
             await ctx.send(f"{ctx.author.mention} 수량은 정수로 입력해주세요.")
             return
-        user_id = str(ctx.author.id)
-        profile = self.get_user_profile(user_id)
-        if not profile:
-            await ctx.send(f"{ctx.author.mention} 게임을 시작하려면 #광산시작 명령어를 사용하세요!")
-            return
         inventory = profile.get("inventory", {})
         if mineral_input not in inventory or inventory[mineral_input] < quantity:
             await ctx.send(f"{ctx.author.mention} 보유한 {mineral_input} 수량이 부족합니다.")
             return
-        # 광물명에서 등급 분리: "기본광물 (등급)"
         match = re.match(r"(.+?) \((.+?)\)$", mineral_input)
         if match:
             base_mineral = match.group(1).strip()
             grade = match.group(2).strip()
         else:
             base_mineral = mineral_input
-            grade = "D"  # 기본 등급
+            grade = "D"
         if base_mineral not in SALE_PRICES:
             await ctx.send(f"{ctx.author.mention} {base_mineral}은(는) 판매할 수 없는 광물입니다.")
             return

@@ -4,10 +4,19 @@ import asyncio  # asyncio 모듈 추가
 from discord.ext import commands
 from pymongo import MongoClient
 import os
+from datetime import datetime
+import pytz
 
 # MongoDB 설정
 MONGO_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "stock_game"
+
+def is_season_active() -> bool:
+    tz = pytz.timezone("Asia/Seoul")
+    now = datetime.now(tz)
+    start = tz.localize(datetime(now.year, now.month, 1, 0, 10))
+    end = tz.localize(datetime(now.year, now.month, 26, 0, 10))
+    return start <= now < end
 
 class AllInConfirmationView(discord.ui.View):
     def __init__(self, author: discord.User, timeout=30):
@@ -46,6 +55,11 @@ class Roulette(commands.Cog):
         숫자를 입력하면 해당 금액을 배팅하고 777 룰렛을 진행합니다.
         '다', '전부', '올인'을 입력하면 가지고 있는 돈을 모두 배팅합니다.
         """
+        # 시즌 활성 여부 체크 (매월 1일 0시 10분 ~ 26일 0시 10분)
+        if not is_season_active():
+            await ctx.send("❌ 현재 시즌은 종료되었습니다. 다음 시즌(매월 1일 0시 10분 이후)에 이용해주세요!")
+            return
+
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
 

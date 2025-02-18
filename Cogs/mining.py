@@ -166,12 +166,12 @@ SALE_PRICES = {
 # --------------------------
 MINERAL_GRADES = {
     "D": {"prob": 40, "xp_multiplier": 1.0, "sale_multiplier": 1.0},
-    "C": {"prob": 25, "xp_multiplier": 1.5, "sale_multiplier": 1.5},
-    "B": {"prob": 15, "xp_multiplier": 2, "sale_multiplier": 2},
-    "A": {"prob": 10, "xp_multiplier": 4, "sale_multiplier": 4},
-    "S": {"prob": 5,  "xp_multiplier": 10, "sale_multiplier": 10},
-    "X": {"prob": 3,  "xp_multiplier": 18, "sale_multiplier": 18},
-    "MAX": {"prob": 2, "xp_multiplier": 27, "sale_multiplier": 27},
+    "C": {"prob": 25, "xp_multiplier": 1.2, "sale_multiplier": 1.5},
+    "B": {"prob": 15, "xp_multiplier": 1.8, "sale_multiplier": 2},
+    "A": {"prob": 10, "xp_multiplier": 2.5, "sale_multiplier": 4},
+    "S": {"prob": 5,  "xp_multiplier": 4, "sale_multiplier": 10},
+    "X": {"prob": 3,  "xp_multiplier": 6, "sale_multiplier": 18},
+    "MAX": {"prob": 2, "xp_multiplier": 9, "sale_multiplier": 27},
 }
 
 # --------------------------

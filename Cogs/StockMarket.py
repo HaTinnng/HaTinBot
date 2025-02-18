@@ -346,8 +346,8 @@ class StockMarket(commands.Cog):
     async def process_season_end(self, now):
         """
         시즌 종료 시 모든 유저의 자산(현금 + 보유 주식 평가액)을 산출하여 상위 3명에게
-        칭호("YYYY 시즌N TOP{순위}")를 부여하고, 모든 유저의 잔액과 포트폴리오(구매가 정보 포함)를 초기화합니다.
-        주식 데이터는 새로 초기화됩니다.
+        칭호("YYYY 시즌N TOP{순위}")를 부여한 후, 유저 자산과 주식 데이터를 초기화합니다.
+        또한, 시즌 종료 시 TOP3 기록을 season_results 컬렉션에 저장합니다.
         """
         ranking = []
         for user in self.db.users.find({}):
@@ -360,6 +360,25 @@ class StockMarket(commands.Cog):
             ranking.append((user["_id"], total))
         ranking.sort(key=lambda x: x[1], reverse=True)
         season = self.db.season.find_one({"_id": "season"})
+        season_name = f"{season['year']} 시즌{season['season_no']}"
+
+        # TOP3 기록을 season_results 컬렉션에 저장
+        season_result_doc = {
+            "season_name": season_name,
+            "results": []
+        }
+        for idx, (user_id, total_assets) in enumerate(ranking[:3], start=1):
+            user = self.db.users.find_one({"_id": user_id})
+            if user:
+                season_result_doc["results"].append({
+                    "rank": idx,
+                    "user_id": user_id,
+                    "username": user.get("username", "알 수 없음"),
+                    "total_assets": total_assets
+                })
+        self.db.season_results.insert_one(season_result_doc)
+
+        # 칭호 부여 (TOP3)
         for idx, (user_id, _) in enumerate(ranking[:3], start=1):
             title = f"{season['year']} 시즌{season['season_no']} TOP{idx}"
             user = self.db.users.find_one({"_id": user_id})
@@ -368,6 +387,8 @@ class StockMarket(commands.Cog):
                 if title not in titles:
                     titles.append(title)
                     self.db.users.update_one({"_id": user_id}, {"$set": {"titles": titles}})
+        
+        # 유저 자산과 포트폴리오 초기화, 주식 데이터 초기화
         self.db.users.update_many({}, {"$set": {"money": DEFAULT_MONEY, "portfolio": {}}})
         self.db.stocks.delete_many({})
         stocks = init_stocks()
@@ -401,6 +422,11 @@ class StockMarket(commands.Cog):
         if self.db.users.find_one({"username": username}):
             await ctx.send("경고: 이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요.")
             return
+
+        # 닉네임의 최대 글자수 제한 (15글자)
+        if len(username) > 15:
+            await ctx.send("경고: 닉네임은 최대 15글자까지 입력할 수 있습니다.")
+            return  
 
         user_id = str(ctx.author.id)
         if self.db.users.find_one({"_id": user_id}):
@@ -1057,6 +1083,105 @@ class StockMarket(commands.Cog):
                 {"$addToSet": {"titles": title}}
             )
             await ctx.send(f"유저 `{target}`에게 '{title}' 칭호가 부여되었습니다.")
+    
+    @commands.command(name="시즌결과")
+    async def season_results(self, ctx, *, season_name: str = None):
+        """
+        #시즌결과:
+        - 인자 없이 실행하면 기록된 모든 시즌명을 나열합니다.
+          (기록된 시즌이 10개 이상일 경우 페이지네이션을 지원합니다.)
+        - 시즌명을 함께 입력하면 해당 시즌의 TOP3 (닉네임, 최종 보유 자금) 결과를 보여줍니다.
+        """
+        if season_name is not None:
+            # 특정 시즌의 결과 조회
+            season_doc = self.db.season_results.find_one({"season_name": season_name})
+            if not season_doc:
+                await ctx.send(f"'{season_name}' 시즌 결과를 찾을 수 없습니다.")
+                return
+            results = season_doc.get("results", [])
+            if not results:
+                await ctx.send(f"'{season_name}' 시즌 결과가 없습니다.")
+                return
+            lines = [f"**{season_name} 시즌 TOP3 결과**"]
+            for entry in results:
+                lines.append(f"{entry['rank']}위: {entry['username']} - {entry['total_assets']}원")
+            await ctx.send("\n".join(lines))
+        else:
+            # 저장된 시즌 목록 조회
+            seasons = list(self.db.season_results.find({}))
+            if not seasons:
+                await ctx.send("아직 기록된 시즌 결과가 없습니다.")
+                return
+
+            # 시즌 이름을 정렬 (예: "2023 시즌1", "2023 시즌2" 등)
+            seasons.sort(key=lambda doc: doc["season_name"])
+
+            if len(seasons) < 10:
+                season_names = [doc["season_name"] for doc in seasons]
+                season_list_str = "\n".join(season_names)
+                await ctx.send(f"기록된 시즌 결과 목록:\n{season_list_str}")
+            else:
+                # 페이지당 10개씩 표시하도록 함
+                items_per_page = 10
+                total_pages = (len(seasons) + items_per_page - 1) // items_per_page
+
+                # View 및 버튼 클래스 정의
+                class SeasonResultsView(discord.ui.View):
+                    def __init__(self, seasons, items_per_page, current_page=0):
+                        super().__init__(timeout=60)
+                        self.seasons = seasons
+                        self.items_per_page = items_per_page
+                        self.current_page = current_page
+                        self.total_pages = (len(seasons) + items_per_page - 1) // items_per_page
+                        self.update_buttons()
+
+                    def update_buttons(self):
+                        # 기존 버튼들 제거 후 재추가
+                        self.clear_items()
+                        self.add_item(PrevButton(self))
+                        # 가운데는 현재 페이지 표시 (클릭 불가)
+                        self.add_item(discord.ui.Button(label=f"{self.current_page+1}/{self.total_pages}", style=discord.ButtonStyle.secondary, disabled=True))
+                        self.add_item(NextButton(self))
+
+                    def get_page_content(self):
+                        start = self.current_page * self.items_per_page
+                        end = start + self.items_per_page
+                        page_seasons = self.seasons[start:end]
+                        lines = [f"{idx+1}. {doc['season_name']}" for idx, doc in enumerate(page_seasons, start=start)]
+                        return "\n".join(lines)
+
+                class PrevButton(discord.ui.Button):
+                    def __init__(self, view_obj):
+                        super().__init__(label="이전", style=discord.ButtonStyle.primary)
+                        self.view_obj = view_obj
+
+                    async def callback(self, interaction: discord.Interaction):
+                        if self.view_obj.current_page <= 0:
+                            await interaction.response.send_message("첫번째 페이지입니다.", ephemeral=True)
+                        else:
+                            self.view_obj.current_page -= 1
+                            self.view_obj.update_buttons()
+                            content = self.view_obj.get_page_content()
+                            await interaction.response.edit_message(content=content, view=self.view_obj)
+
+                class NextButton(discord.ui.Button):
+                    def __init__(self, view_obj):
+                        super().__init__(label="다음", style=discord.ButtonStyle.primary)
+                        self.view_obj = view_obj
+
+                    async def callback(self, interaction: discord.Interaction):
+                        if self.view_obj.current_page >= self.view_obj.total_pages - 1:
+                            await interaction.response.send_message("마지막 페이지입니다.", ephemeral=True)
+                        else:
+                            self.view_obj.current_page += 1
+                            self.view_obj.update_buttons()
+                            content = self.view_obj.get_page_content()
+                            await interaction.response.edit_message(content=content, view=self.view_obj)
+
+                view = SeasonResultsView(seasons, items_per_page)
+                content = view.get_page_content()
+                await ctx.send(content, view=view)
+
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

@@ -128,7 +128,7 @@ MINES = {
     },
     "최종광산": {
         "req_user_level": 20,
-        "req_equipment_level": 20,
+        "req_equipment_level": 19,
         "minerals": {
             "루비": {"chance": 10, "min_qty": 1, "max_qty": 2},
             "오리하르콘": {"chance": 20, "min_qty": 1, "max_qty": 2},

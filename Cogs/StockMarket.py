@@ -819,8 +819,23 @@ class StockMarket(commands.Cog):
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
 
-        # Linux의 한글 지원 폰트인 "NanumGothic"을 사용하여 폰트 설정
-        plt.rcParams["font.family"] = "NanumGothic"
+        # 1. 커스텀 폰트 파일의 절대 경로 계산 (프로젝트 루트의 fonts 폴더 내 "MyCustomFont.ttf")
+        # __file__은 현재 이 Cog 파일의 경로이므로, 프로젝트 루트까지의 경로를 직접 조정합니다.
+        # 예를 들어, 현재 폴더(Cogs)에서 상위 폴더로 올라가서 fonts 폴더로 접근하는 경우:
+        font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", "온글잎 나나양.ttf")
+        if not os.path.exists(font_path):
+            await ctx.send("커스텀 폰트 파일을 찾을 수 없습니다.")
+            return
+
+        # 2. 폰트를 fontManager에 추가하고 FontProperties 생성
+        try:
+            fm.fontManager.addfont(font_path)
+            font_prop = fm.FontProperties(fname=font_path)
+            custom_font = font_prop.get_name()
+        except Exception as e:
+            print("커스텀 폰트 로드 오류:", e)
+            custom_font = "sans-serif"
+        plt.rcParams["font.family"] = custom_font
         plt.rcParams["axes.unicode_minus"] = False
 
         # 그래프 그리기

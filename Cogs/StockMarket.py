@@ -8,6 +8,7 @@ from pymongo import MongoClient
 import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib.font_manager as fm
 
 # ===== 상수 설정 =====
 JOIN_BONUS = 800000         # 참가 시 지급 자금 (800,000원)
@@ -15,7 +16,23 @@ DEFAULT_MONEY = 750000      # 시즌 초기화 후 유저 기본 잔액 (800,000
 SUPPORT_AMOUNT = 50000  # 지원금 5만원
 # MongoDB URI는 클라우드에서 비밀변수 MONGODB_URI를 통해 불러옵니다.
 MONGO_URI = os.environ.get("MONGODB_URI")
-DB_NAME = "stock_game"
+DB_NAME = "stock_game"'
+
+# 설치된 폰트 목록에서 한글 지원 폰트를 찾는 함수
+def get_available_korean_font():
+    # 선호하는 한글 폰트 순서
+    preferred_fonts = ["Malgun Gothic", "NanumGothic", "AppleGothic"]
+    available_fonts = [f.name for f in fm.fontManager.ttflist]
+    for font in preferred_fonts:
+        if font in available_fonts:
+            return font
+    return "sans-serif"  # fallback
+
+korean_font = get_available_korean_font()
+plt.rcParams["font.family"] = korean_font
+plt.rcParams["axes.unicode_minus"] = False
+
+print("Using font:", korean_font)
 
 # ===== DB에 저장할 주식 초기화 함수 =====
 def init_stocks():

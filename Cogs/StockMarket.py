@@ -819,8 +819,8 @@ class StockMarket(commands.Cog):
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
 
-        # Windows 11의 한글 지원 폰트인 "Malgun Gothic"을 사용하여 폰트 설정
-        plt.rcParams["font.family"] = "Malgun Gothic"
+        # Linux의 한글 지원 폰트인 "NanumGothic"을 사용하여 폰트 설정
+        plt.rcParams["font.family"] = "NanumGothic"
         plt.rcParams["axes.unicode_minus"] = False
 
         # 그래프 그리기
@@ -846,8 +846,6 @@ class StockMarket(commands.Cog):
 
         file = discord.File(fp=buffer, filename="price_history.png")
         await ctx.send(file=file)
-
-
 
     @commands.command(name="주식완전초기화")
     @commands.is_owner()

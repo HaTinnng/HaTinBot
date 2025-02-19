@@ -16,7 +16,7 @@ DEFAULT_MONEY = 750000      # 시즌 초기화 후 유저 기본 잔액 (800,000
 SUPPORT_AMOUNT = 50000  # 지원금 5만원
 # MongoDB URI는 클라우드에서 비밀변수 MONGODB_URI를 통해 불러옵니다.
 MONGO_URI = os.environ.get("MONGODB_URI")
-DB_NAME = "stock_game"'
+DB_NAME = "stock_game"
 
 # 설치된 폰트 목록에서 한글 지원 폰트를 찾는 함수
 def get_available_korean_font():

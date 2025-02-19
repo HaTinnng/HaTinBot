@@ -18,16 +18,6 @@ SUPPORT_AMOUNT = 50000  # 지원금 5만원
 MONGO_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "stock_game"
 
-# 설치된 폰트 목록에서 한글 지원 폰트를 찾는 함수
-def get_available_korean_font():
-    # 선호하는 한글 폰트 순서
-    preferred_fonts = ["Malgun Gothic", "NanumGothic", "AppleGothic"]
-    available_fonts = [f.name for f in fm.fontManager.ttflist]
-    for font in preferred_fonts:
-        if font in available_fonts:
-            return font
-    return "sans-serif"  # fallback
-
 korean_font = get_available_korean_font()
 plt.rcParams["font.family"] = korean_font
 plt.rcParams["axes.unicode_minus"] = False
@@ -815,15 +805,15 @@ class StockMarket(commands.Cog):
             f"시즌 기간: {season_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"남은 시간: {remaining_str}"
         )
-        
+
     @commands.command(name="변동내역")
     async def price_history(self, ctx, stock_name: str):
         """
         #변동내역 [주식명]:
         해당 주식의 최근 5회 가격 기록을 간단한 선 그래프로 출력합니다.
-        그래프 제목에 한글이 깨지지 않고, 각 데이터 포인트 위에 가격을 표시하며,
-        x축 눈금 간격을 1로 설정합니다.
+        이때, custom font (font.ttf)를 사용합니다.
         """
+        # 예시: 데이터베이스에서 주식 데이터를 가져온다고 가정
         stock = self.db.stocks.find_one({"name": stock_name})
         if not stock:
             await ctx.send("존재하지 않는 주식 종목입니다.")
@@ -832,31 +822,34 @@ class StockMarket(commands.Cog):
         if not history:
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
-        # 한글 폰트 설정 (Windows의 경우 "Malgun Gothic", 다른 OS에서는 적절한 폰트로 변경)
-        plt.rcParams["font.family"] = "Malgun Gothic"
+
+        # 1. custom font 설정 (현재 디렉터리에 font.ttf가 존재)
+        font_path = "font.ttf"
+        font_prop = fm.FontProperties(fname=font_path)
+        plt.rcParams["font.family"] = font_prop.get_name()  # font.ttf에 정의된 폰트 이름 사용
         plt.rcParams["axes.unicode_minus"] = False
-        
+
+        # 2. 그래프 그리기
         plt.figure(figsize=(6, 4))
         plt.plot(history, marker='o', linestyle='-', color='blue')
         plt.title(f"{stock_name} 변동 내역")
         plt.xlabel("측정 횟수")
         plt.ylabel("가격 (원)")
         plt.grid(True)
-        
-        # 각 데이터 포인트 위에 가격을 표시 (천 단위 구분 기호 포함)
+
+        # 각 데이터 포인트 위에 가격을 표시 (천 단위 구분 포함)
         for i, price in enumerate(history):
             plt.text(i, price, f"{price:,}원", ha='center', va='bottom', fontsize=9)
-            
-        ax = plt.gca()
-        # x축 눈금 간격을 1로 설정하고, 1부터 시작하는 눈금 라벨 지정
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    
+        # x축 눈금은 1부터 시작하도록 설정
         plt.xticks(range(len(history)), range(1, len(history) + 1))
-        
+
+        # 3. 그래프를 이미지로 저장한 후 Discord에 전송
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png")
         buffer.seek(0)
         plt.close()
-        
+
         file = discord.File(fp=buffer, filename="price_history.png")
         await ctx.send(file=file)
 
@@ -1289,6 +1282,7 @@ class StockMarket(commands.Cog):
                 view = SeasonResultsView(seasons, items_per_page)
                 content = view.get_page_content()
                 await ctx.send(content, view=view)
+
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

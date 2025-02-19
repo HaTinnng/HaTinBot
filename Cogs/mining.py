@@ -696,7 +696,12 @@ class MiningSystem(commands.Cog):
             await ctx.send(f"{ctx.author.mention} 이미 최대 강화 단계(20)입니다.")
             return
         req_lucy, success_rate = self.get_equipment_upgrade_requirements(current_level)
-        info = f"요구 루찌: {req_lucy}\n강화 성공 확률: {success_rate}%\n(※ 필요 광물은 없습니다.)"
+        info = (
+            f"현재 장비 레벨: Lv.{current_level} -> Lv.{current_level+1}\n"
+            f"요구 루찌: {req_lucy}\n"
+            f"강화 성공 확률: {success_rate}%\n"
+            f"(※ 필요 광물은 없습니다.)"
+        )
         embed = discord.Embed(title="장비 강화 정보", description=info, color=discord.Color.purple())
         view = ConfirmActionView(ctx.author, timeout=30)
         await ctx.send(embed=embed, view=view)
@@ -726,7 +731,7 @@ class MiningSystem(commands.Cog):
                 result_msg = f"{ctx.author.mention} 강화에 실패하였습니다. 현재 장비: {profile['equipment']} (소모 자원은 회수되지 않습니다.)"
         self.update_user_profile(user_id, profile)
         await ctx.send(result_msg)
-    
+
     # --------------------------
     # 인벤토리 증가 명령어 (최대 30 제한, 버튼 확인 추가)
     # --------------------------
@@ -747,7 +752,10 @@ class MiningSystem(commands.Cog):
             return
         current_capacity = profile["inventory_capacity"]
         cost = self.get_inventory_upgrade_cost(current_capacity)
-        info = f"인벤토리 증가 비용: {cost} 루찌\n(최대 용량: 30)"
+        info = (
+            f"현재 인벤토리 용량: {current_capacity} -> {current_capacity + 1}\n"
+            f"인벤토리 증가 비용: {cost} 루찌\n(최대 용량: 30)"
+        )
         embed = discord.Embed(title="인벤토리 증가 정보", description=info, color=discord.Color.purple())
         view = ConfirmActionView(ctx.author, timeout=30)
         await ctx.send(embed=embed, view=view)
@@ -762,6 +770,7 @@ class MiningSystem(commands.Cog):
         profile["inventory_capacity"] += 1
         self.update_user_profile(user_id, profile)
         await ctx.send(f"{ctx.author.mention} 인벤토리 용량이 {current_capacity}에서 {profile['inventory_capacity']}로 증가하였습니다! (소요 루찌: {cost})")
+
 
 async def setup(bot):
     await bot.add_cog(MiningSystem(bot))

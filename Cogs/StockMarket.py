@@ -18,11 +18,7 @@ SUPPORT_AMOUNT = 50000  # 지원금 5만원
 MONGO_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "stock_game"
 
-korean_font = get_available_korean_font()
-plt.rcParams["font.family"] = korean_font
 plt.rcParams["axes.unicode_minus"] = False
-
-print("Using font:", korean_font)
 
 # ===== DB에 저장할 주식 초기화 함수 =====
 def init_stocks():

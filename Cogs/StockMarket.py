@@ -841,14 +841,14 @@ class StockMarket(commands.Cog):
         # 그래프 그리기
         plt.figure(figsize=(6, 4))
         plt.plot(history, marker='o', linestyle='-', color='blue')
-        plt.title(f"{stock_name} 변동 내역")
-        plt.xlabel("측정 횟수")
-        plt.ylabel("가격 (원)")
+        plt.title(f"{stock_name} 변동 내역", fontsize=16)
+        plt.xlabel("측정 횟수", fontsize=14)
+        plt.ylabel("가격 (원)", fontsize=14)
         plt.grid(True)
 
         # 각 데이터 포인트 위에 가격 표시 (천 단위 구분 포함)
         for i, price in enumerate(history):
-            plt.text(i, price, f"{price:,}원", ha='center', va='bottom', fontsize=9)
+            plt.text(i, price, f"{price:,}", ha='center', va='bottom', fontsize=10)
 
         # x축 눈금을 1부터 시작하는 정수로 설정
         plt.xticks(range(len(history)), range(1, len(history) + 1))

@@ -843,13 +843,20 @@ class StockMarket(commands.Cog):
         plt.plot(history, marker='o', linestyle='-', color='blue')
         plt.title(f"{stock_name} 변동 내역", fontsize=16, fontweight="bold")
         plt.xlabel("측정 횟수", fontsize=14)
-        plt.ylabel("가격 (원)", fontsize=14)
+        plt.ylabel("주가 (원)", fontsize=14)
         plt.grid(True)
 
         # 각 데이터 포인트 위에 가격 표시 (천 단위 구분 포함)
         for i, price in enumerate(history):
-            plt.text(i, price, f"{price:,}", ha='center', va='bottom', fontsize=10)
-
+            plt.annotate(
+                f"{price:,}",
+                xy=(i, price),
+                xytext=(-10, 0),
+                textcoords="offset points",
+                ha="right",
+                va="center",
+                fontsize=10
+            )
         # x축 눈금을 1부터 시작하는 정수로 설정
         plt.xticks(range(len(history)), range(1, len(history) + 1))
 

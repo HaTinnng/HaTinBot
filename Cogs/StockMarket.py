@@ -841,7 +841,7 @@ class StockMarket(commands.Cog):
         # 그래프 그리기
         plt.figure(figsize=(6, 4))
         plt.plot(history, marker='o', linestyle='-', color='blue')
-        plt.title(f"{stock_name} 변동 내역", fontsize=16)
+        plt.title(f"{stock_name} 변동 내역", fontsize=16, fontweight="bold")
         plt.xlabel("측정 횟수", fontsize=14)
         plt.ylabel("가격 (원)", fontsize=14)
         plt.grid(True)

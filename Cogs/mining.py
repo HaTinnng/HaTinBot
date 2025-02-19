@@ -128,7 +128,7 @@ MINES = {
     },
     "최종광산": {
         "req_user_level": 20,
-        "req_equipment_level": 19,
+        "req_equipment_level": 20,
         "minerals": {
             "루비": {"chance": 10, "min_qty": 1, "max_qty": 2},
             "오리하르콘": {"chance": 20, "min_qty": 1, "max_qty": 2},
@@ -168,7 +168,7 @@ MINERAL_GRADES = {
     "D": {"prob": 40, "xp_multiplier": 1.0, "sale_multiplier": 1.0},
     "C": {"prob": 25, "xp_multiplier": 1.2, "sale_multiplier": 1.5},
     "B": {"prob": 15, "xp_multiplier": 1.8, "sale_multiplier": 2},
-    "A": {"prob": 10, "xp_multiplier": 2.5, "sale_multiplier": 4},
+    "A": {"prob": 10, "xp_multiplier": 2.5, "sale_multiplier": 5},
     "S": {"prob": 5,  "xp_multiplier": 4, "sale_multiplier": 10},
     "X": {"prob": 3,  "xp_multiplier": 6, "sale_multiplier": 18},
     "MAX": {"prob": 2, "xp_multiplier": 9, "sale_multiplier": 27},
@@ -217,12 +217,12 @@ def get_equipment_name(level: int) -> str:
     elif level == 19:
         return f"최강의 이리듐 곡괭이 (Lv.{level})"
     else:
-        return f"갤럭시 곡괭이 (Lv.{level})"
+        return f"여래신장 (Lv.{level})"
 
 # --------------------------
-# Confirm View for 완전 초기화
+# ConfirmActionView: 예/아니요 버튼 (30초 제한, 명령어 입력자 전용)
 # --------------------------
-class ResetConfirmView(discord.ui.View):
+class ConfirmActionView(discord.ui.View):
     def __init__(self, author: discord.User, timeout=30):
         super().__init__(timeout=timeout)
         self.author = author
@@ -230,21 +230,21 @@ class ResetConfirmView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.author.id:
-            await interaction.response.send_message("이 명령어는 봇 소유자만 사용할 수 있습니다.", ephemeral=True)
+            await interaction.response.send_message("이 명령어를 입력한 본인만 사용할 수 있습니다.", ephemeral=True)
             return False
         return True
 
-    @discord.ui.button(label="동의", style=discord.ButtonStyle.green)
-    async def agree(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="예", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.value = True
         self.stop()
-        await interaction.response.edit_message(content="모든 광산 데이터가 삭제됩니다.", view=None)
+        await interaction.response.edit_message(content="진행합니다.", view=None)
 
-    @discord.ui.button(label="그만두기", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="아니요", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.value = False
         self.stop()
-        await interaction.response.edit_message(content="초기화가 취소되었습니다.", view=None)
+        await interaction.response.edit_message(content="취소되었습니다.", view=None)
 
 # --------------------------
 # MiningSystem Cog
@@ -256,13 +256,13 @@ class MiningSystem(commands.Cog):
         self.db = self.mongo_client["stock_game"]
         # active_sessions: { user_id: session_data }
         self.active_sessions = {}
-    
+
     def get_user_profile(self, user_id):
         return self.db.mining_users.find_one({"_id": user_id})
-    
+
     def update_user_profile(self, user_id, profile):
         self.db.mining_users.update_one({"_id": user_id}, {"$set": profile})
-    
+
     # 강화 비용과 성공 확률 (장비 최대 20)
     # 강화 비용은 100 * 현재 장비 레벨, 성공 확률은 max(25, 100 - (현재장비레벨 * 5))
     # 단, 장비 레벨 11 이상부터 강화 실패 시 하락 확률 발생 (하락 확률 = (현재장비레벨 - 10) * 2)
@@ -270,10 +270,10 @@ class MiningSystem(commands.Cog):
         req_lucy = 100 * current_level
         success_rate = max(25, 100 - current_level * 5)
         return req_lucy, success_rate
-    
+
     def get_inventory_upgrade_cost(self, current_capacity):
         return 200 * (current_capacity - 5 + 1)
-    
+
     # --------------------------
     # 게임 시작 명령어 (닉네임 추가, 중복 및 빈칸 체크)
     # --------------------------
@@ -291,7 +291,7 @@ class MiningSystem(commands.Cog):
         if self.db.mining_users.find_one({"nickname": nickname}):
             await ctx.send(f"{ctx.author.mention} 이미 사용 중인 닉네임입니다. 다른 닉네임을 선택해주세요.")
             return
-        
+
         user_id = str(ctx.author.id)
         profile = self.get_user_profile(user_id)
         if profile:
@@ -311,7 +311,7 @@ class MiningSystem(commands.Cog):
         }
         self.db.mining_users.insert_one(new_profile)
         await ctx.send(f"{ctx.author.mention} 광산 게임을 시작했습니다! 환영합니다, **{nickname}**!")
-    
+
     # --------------------------
     # 광산유저삭제 명령어 (봇 소유자 전용)
     # --------------------------
@@ -332,7 +332,7 @@ class MiningSystem(commands.Cog):
             await ctx.send(f"**{nickname}** 닉네임을 가진 유저의 데이터가 삭제되었습니다.")
         else:
             await ctx.send(f"닉네임 **{nickname}**을 가진 유저를 찾을 수 없습니다.")
-    
+
     # --------------------------
     # 광산완전초기화 명령어 (봇 소유자 전용)
     # --------------------------
@@ -353,7 +353,7 @@ class MiningSystem(commands.Cog):
             await ctx.send("모든 광산 데이터가 삭제되었습니다.")
         else:
             await ctx.send("광산 초기화가 취소되었습니다.")
-    
+
     # --------------------------
     # 광산프로필 명령어
     # --------------------------
@@ -378,7 +378,7 @@ class MiningSystem(commands.Cog):
         embed.add_field(name="인벤토리", value=f"{used}/{profile['inventory_capacity']}", inline=True)
         embed.add_field(name="경험치", value=f"{profile.get('xp',0)}/{profile.get('next_xp',100)}", inline=True)
         await ctx.send(embed=embed)
-    
+
     # --------------------------
     # 연속 채취 세션 함수
     # --------------------------
@@ -468,7 +468,7 @@ class MiningSystem(commands.Cog):
         if user_id in self.active_sessions:
             self.active_sessions.pop(user_id)
             await ctx.send(f"{ctx.author.mention} 채취 세션이 종료되었습니다.")
-    
+
     # --------------------------
     # 광산입장 명령어 (채취 세션 시작)
     # --------------------------
@@ -620,7 +620,7 @@ class MiningSystem(commands.Cog):
         #광물판매 [광물이름] [수량]:
         보유한 광물을 판매하여 루찌를 획득합니다.
         광물 이름에는 등급이 포함되어야 합니다. 예: "철 (S)"
-        만약 [수량] 자리에 "다" 또는 "전부"를 입력하면 해당 광물을 인벤토리에서 전부 판매합니다.
+        만약 [수량]에 "다" 또는 "전부"가 입력되면 인벤토리 내 모든 해당 광물을 판매합니다.
         (판매 가격은 SALE_PRICES에 등급 판매 배율을 곱하여 계산됩니다.)
         """
         args = args.strip()
@@ -629,49 +629,28 @@ class MiningSystem(commands.Cog):
         if not profile:
             await ctx.send(f"{ctx.author.mention} 게임을 시작하려면 #광산시작 명령어를 사용하세요!")
             return
-        
-        # 만약 전체 판매를 원할 경우 (예: "#광물판매 다")
-        if args in ["다", "전부"]:
-            inventory = profile.get("inventory", {})
-            if not inventory:
-                await ctx.send(f"{ctx.author.mention} 인벤토리가 비어 있습니다.")
-                return
-            total_earnings = 0
-            for mineral, qty in list(inventory.items()):
-                match = re.match(r"(.+?) \((.+?)\)$", mineral)
-                if match:
-                    base_mineral = match.group(1).strip()
-                    grade = match.group(2).strip()
-                else:
-                    base_mineral = mineral
-                    grade = "D"
-                if base_mineral not in SALE_PRICES:
-                    continue
-                multiplier = MINERAL_GRADES.get(grade, {"sale_multiplier": 1.0})["sale_multiplier"]
-                unit_price = SALE_PRICES[base_mineral] * multiplier
-                total_earnings += int(unit_price * qty)
-                del inventory[mineral]
-            profile["inventory"] = inventory
-            profile["루찌"] = profile.get("루찌", 0) + total_earnings
-            self.update_user_profile(user_id, profile)
-            await ctx.send(f"{ctx.author.mention} 인벤토리 내 모든 광물을 판매하여 {total_earnings} 루찌를 획득했습니다.")
-            return
-        
-        # 기본 판매: "#광물판매 [광물이름] [수량]"
+
         parts = args.rsplit(" ", 1)
         if len(parts) != 2:
             await ctx.send(f"{ctx.author.mention} 올바른 형식으로 입력해주세요. 예: #광물판매 철 (S) 1")
             return
         mineral_input, quantity_str = parts
-        try:
-            quantity = int(quantity_str)
-        except ValueError:
-            await ctx.send(f"{ctx.author.mention} 수량은 정수로 입력해주세요.")
-            return
         inventory = profile.get("inventory", {})
-        if mineral_input not in inventory or inventory[mineral_input] < quantity:
-            await ctx.send(f"{ctx.author.mention} 보유한 {mineral_input} 수량이 부족합니다.")
-            return
+        if quantity_str in ["다", "전부"]:
+            if mineral_input not in inventory:
+                await ctx.send(f"{ctx.author.mention} 보유한 {mineral_input}이(가) 없습니다.")
+                return
+            quantity = inventory[mineral_input]
+        else:
+            try:
+                quantity = int(quantity_str)
+            except ValueError:
+                await ctx.send(f"{ctx.author.mention} 수량은 정수로 입력해주세요.")
+                return
+            if mineral_input not in inventory or inventory[mineral_input] < quantity:
+                await ctx.send(f"{ctx.author.mention} 보유한 {mineral_input} 수량이 부족합니다.")
+                return
+
         match = re.match(r"(.+?) \((.+?)\)$", mineral_input)
         if match:
             base_mineral = match.group(1).strip()
@@ -717,11 +696,15 @@ class MiningSystem(commands.Cog):
             await ctx.send(f"{ctx.author.mention} 이미 최대 강화 단계(20)입니다.")
             return
         req_lucy, success_rate = self.get_equipment_upgrade_requirements(current_level)
-        req_str = f"**요구 루찌:** {req_lucy}\n"
-        req_str += f"**강화 성공 확률:** {success_rate}%\n"
-        req_str += "(※ 필요 광물은 없습니다.)"
-        embed = discord.Embed(title="장비 강화 요구 사항", description=req_str, color=discord.Color.purple())
-        await ctx.send(embed=embed)
+        info = f"요구 루찌: {req_lucy}\n강화 성공 확률: {success_rate}%\n(※ 필요 광물은 없습니다.)"
+        embed = discord.Embed(title="장비 강화 정보", description=info, color=discord.Color.purple())
+        view = ConfirmActionView(ctx.author, timeout=30)
+        await ctx.send(embed=embed, view=view)
+        await view.wait()
+        if view.value is None or view.value is False:
+            await ctx.send(f"{ctx.author.mention} 장비 강화가 취소되었습니다.")
+            return
+        # 진행
         if profile.get("루찌", 0) < req_lucy:
             await ctx.send(f"{ctx.author.mention} 루찌가 부족합니다. (보유: {profile.get('루찌', 0)} 루찌)")
             return
@@ -745,7 +728,7 @@ class MiningSystem(commands.Cog):
         await ctx.send(result_msg)
     
     # --------------------------
-    # 인벤토리 증가 명령어 (최대 30 제한)
+    # 인벤토리 증가 명령어 (최대 30 제한, 버튼 확인 추가)
     # --------------------------
     @commands.command(name="인벤토리증가")
     async def upgrade_inventory(self, ctx):
@@ -764,6 +747,14 @@ class MiningSystem(commands.Cog):
             return
         current_capacity = profile["inventory_capacity"]
         cost = self.get_inventory_upgrade_cost(current_capacity)
+        info = f"인벤토리 증가 비용: {cost} 루찌\n(최대 용량: 30)"
+        embed = discord.Embed(title="인벤토리 증가 정보", description=info, color=discord.Color.purple())
+        view = ConfirmActionView(ctx.author, timeout=30)
+        await ctx.send(embed=embed, view=view)
+        await view.wait()
+        if view.value is None or view.value is False:
+            await ctx.send(f"{ctx.author.mention} 인벤토리 증가가 취소되었습니다.")
+            return
         if profile.get("루찌", 0) < cost:
             await ctx.send(f"{ctx.author.mention} 루찌가 부족합니다. (필요: {cost} 루찌, 보유: {profile.get('루찌', 0)} 루찌)")
             return

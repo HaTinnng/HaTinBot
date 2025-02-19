@@ -5,6 +5,8 @@ import random
 from datetime import datetime, timedelta
 import pytz
 from pymongo import MongoClient
+import io
+import matplotlib.pyplot as plt
 
 # ===== 상수 설정 =====
 JOIN_BONUS = 800000         # 참가 시 지급 자금 (800,000원)
@@ -796,13 +798,11 @@ class StockMarket(commands.Cog):
             f"남은 시간: {remaining_str}"
         )
 
-
     @commands.command(name="변동내역")
     async def price_history(self, ctx, stock_name: str):
         """
         #변동내역 [주식명]:
-        해당 주식의 최근 5회 가격 기록과 각 기록이 바로 이전 대비 상승(🔺),
-        하락(🔻), 동일(⏺)했는지를 표시하여 출력합니다.
+        해당 주식의 최근 5회 가격 기록을 간단한 선 그래프로 출력합니다.
         """
         stock = self.db.stocks.find_one({"name": stock_name})
         if not stock:
@@ -812,20 +812,23 @@ class StockMarket(commands.Cog):
         if not history:
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
-        lines = [f"**{stock_name} 최근 변동 내역**"]
-        for i, price in enumerate(history):
-            if i == 0:
-                arrow = "⏺"
-            else:
-                prev = history[i-1]
-                if price > prev:
-                    arrow = "🔺"
-                elif price < prev:
-                    arrow = "🔻"
-                else:
-                    arrow = "⏺"
-            lines.append(f"{price}원 {arrow}")
-        await ctx.send("\n".join(lines))
+        
+        # matplotlib를 사용하여 그래프 그리기
+        plt.figure(figsize=(6, 4))
+        plt.plot(history, marker='o', linestyle='-', color='blue')
+        plt.title(f"{stock_name} 변동 내역")
+        plt.xlabel("측정 횟수")
+        plt.ylabel("가격 (원)")
+        plt.grid(True)
+        
+        # 이미지 데이터를 BytesIO에 저장
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format="png")
+        buffer.seek(0)
+        plt.close()
+        
+        file = discord.File(fp=buffer, filename="price_history.png")
+        await ctx.send(file=file)
 
     @commands.command(name="주식완전초기화")
     @commands.is_owner()

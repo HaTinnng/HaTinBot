@@ -7,6 +7,7 @@ import pytz
 from pymongo import MongoClient
 import io
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 # ===== 상수 설정 =====
 JOIN_BONUS = 800000         # 참가 시 지급 자금 (800,000원)
@@ -797,12 +798,14 @@ class StockMarket(commands.Cog):
             f"시즌 기간: {season_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"남은 시간: {remaining_str}"
         )
-
+        
     @commands.command(name="변동내역")
     async def price_history(self, ctx, stock_name: str):
         """
         #변동내역 [주식명]:
         해당 주식의 최근 5회 가격 기록을 간단한 선 그래프로 출력합니다.
+        그래프 제목에 한글이 깨지지 않고, 각 데이터 포인트 위에 가격을 표시하며,
+        x축 눈금 간격을 1로 설정합니다.
         """
         stock = self.db.stocks.find_one({"name": stock_name})
         if not stock:
@@ -812,8 +815,10 @@ class StockMarket(commands.Cog):
         if not history:
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
+        # 한글 폰트 설정 (Windows의 경우 "Malgun Gothic", 다른 OS에서는 적절한 폰트로 변경)
+        plt.rcParams["font.family"] = "Malgun Gothic"
+        plt.rcParams["axes.unicode_minus"] = False
         
-        # matplotlib를 사용하여 그래프 그리기
         plt.figure(figsize=(6, 4))
         plt.plot(history, marker='o', linestyle='-', color='blue')
         plt.title(f"{stock_name} 변동 내역")
@@ -821,7 +826,15 @@ class StockMarket(commands.Cog):
         plt.ylabel("가격 (원)")
         plt.grid(True)
         
-        # 이미지 데이터를 BytesIO에 저장
+        # 각 데이터 포인트 위에 가격을 표시 (천 단위 구분 기호 포함)
+        for i, price in enumerate(history):
+            plt.text(i, price, f"{price:,}원", ha='center', va='bottom', fontsize=9)
+            
+        ax = plt.gca()
+        # x축 눈금 간격을 1로 설정하고, 1부터 시작하는 눈금 라벨 지정
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+        plt.xticks(range(len(history)), range(1, len(history) + 1))
+        
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png")
         buffer.seek(0)
@@ -1259,7 +1272,6 @@ class StockMarket(commands.Cog):
                 view = SeasonResultsView(seasons, items_per_page)
                 content = view.get_page_content()
                 await ctx.send(content, view=view)
-
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

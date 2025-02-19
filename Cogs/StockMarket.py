@@ -818,14 +818,20 @@ class StockMarket(commands.Cog):
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
 
-        # 1. 커스텀 폰트 설정: 현재 파일 기준으로 Cogs 폴더 내의 font.ttf 사용
         font_path = os.path.join(os.path.dirname(__file__), "font.ttf")
-        try:
-            fm.fontManager.addfont(font_path)
-        except Exception as e:
-            print("폰트 추가 오류:", e)
-        font_prop = fm.FontProperties(fname=font_path)
-        plt.rcParams["font.family"] = font_prop.get_name()
+        if os.path.exists(font_path):
+            try:
+                fm.fontManager.addfont(font_path)
+                font_prop = fm.FontProperties(fname=font_path)
+                custom_font = font_prop.get_name()
+            except Exception as e:
+                print("폰트 추가 오류:", e)
+                custom_font = "sans-serif"
+        else:
+            print("폰트 파일이 존재하지 않습니다:", font_path)
+            custom_font = "sans-serif"
+
+        plt.rcParams["font.family"] = custom_font
         plt.rcParams["axes.unicode_minus"] = False
 
         # 2. 그래프 그리기

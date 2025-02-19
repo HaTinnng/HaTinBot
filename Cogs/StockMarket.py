@@ -806,9 +806,10 @@ class StockMarket(commands.Cog):
     async def price_history(self, ctx, stock_name: str):
         """
         #변동내역 [주식명]:
-        해당 주식의 최근 5회 가격 기록을 커스텀 폰트(Cogs/font.ttf)를 적용한 선 그래프로 출력합니다.
+        해당 주식의 최근 5회 가격 기록을 Windows 11의 Malgun Gothic 폰트를 사용해
+        선 그래프로 출력합니다.
         """
-        # 데이터베이스에서 해당 주식 데이터 가져오기
+        # 데이터베이스에서 주식 데이터 가져오기
         stock = self.db.stocks.find_one({"name": stock_name})
         if not stock:
             await ctx.send("존재하지 않는 주식 종목입니다.")
@@ -818,23 +819,11 @@ class StockMarket(commands.Cog):
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
 
-        font_path = os.path.join(os.path.dirname(__file__), "font.ttf")
-        if os.path.exists(font_path):
-            try:
-                fm.fontManager.addfont(font_path)
-                font_prop = fm.FontProperties(fname=font_path)
-                custom_font = font_prop.get_name()
-            except Exception as e:
-                print("폰트 추가 오류:", e)
-                custom_font = "sans-serif"
-        else:
-            print("폰트 파일이 존재하지 않습니다:", font_path)
-            custom_font = "sans-serif"
-
-        plt.rcParams["font.family"] = custom_font
+        # Windows 11의 한글 지원 폰트인 "Malgun Gothic"을 사용하여 폰트 설정
+        plt.rcParams["font.family"] = "Malgun Gothic"
         plt.rcParams["axes.unicode_minus"] = False
 
-        # 2. 그래프 그리기
+        # 그래프 그리기
         plt.figure(figsize=(6, 4))
         plt.plot(history, marker='o', linestyle='-', color='blue')
         plt.title(f"{stock_name} 변동 내역")
@@ -842,14 +831,14 @@ class StockMarket(commands.Cog):
         plt.ylabel("가격 (원)")
         plt.grid(True)
 
-        # 각 데이터 포인트 위에 가격 표시 (예: 1,234원)
+        # 각 데이터 포인트 위에 가격 표시 (천 단위 구분 포함)
         for i, price in enumerate(history):
             plt.text(i, price, f"{price:,}원", ha='center', va='bottom', fontsize=9)
 
         # x축 눈금을 1부터 시작하는 정수로 설정
         plt.xticks(range(len(history)), range(1, len(history) + 1))
 
-        # 3. 그래프를 이미지 파일로 저장 후 Discord에 전송
+        # 그래프를 이미지로 저장 후 Discord에 전송
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png")
         buffer.seek(0)
@@ -857,6 +846,7 @@ class StockMarket(commands.Cog):
 
         file = discord.File(fp=buffer, filename="price_history.png")
         await ctx.send(file=file)
+
 
 
     @commands.command(name="주식완전초기화")
@@ -1288,7 +1278,6 @@ class StockMarket(commands.Cog):
                 view = SeasonResultsView(seasons, items_per_page)
                 content = view.get_page_content()
                 await ctx.send(content, view=view)
-
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

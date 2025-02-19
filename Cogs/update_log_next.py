@@ -4,7 +4,7 @@ from discord.ext import commands
 # 다음 업데이트 내역 (개발자가 직접 수정)
 NEXT_UPDATE_LOGS = [
     {
-        "date": "2025-02-31",
+        "date": "2025-02-26",
         "details": [
             "**시즌 종료**",
             "2025 시즌1이 종료가 됩니다.",

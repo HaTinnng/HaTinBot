@@ -819,8 +819,8 @@ class StockMarket(commands.Cog):
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
 
-        # 1. custom font 설정 (현재 디렉터리에 font.ttf가 존재)
-        font_path = "font.ttf"
+        # 1. custom font 설정 (현재 디렉터리에 Cogs/font.ttf가 존재)
+        font_path = "Cogs/font.ttf"
         font_prop = fm.FontProperties(fname=font_path)
         plt.rcParams["font.family"] = font_prop.get_name()  # font.ttf에 정의된 폰트 이름 사용
         plt.rcParams["axes.unicode_minus"] = False

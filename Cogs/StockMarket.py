@@ -819,11 +819,14 @@ class StockMarket(commands.Cog):
             await ctx.send("해당 주식의 변동 내역이 없습니다.")
             return
 
-        # 1. custom font 설정 (현재 디렉터리에 Cogs/font.ttf가 존재)
-        font_path = "Cogs/font.ttf"
+        # 폰트 파일 경로를 현재 파일 기준 절대 경로로 설정 (Cogs 폴더 내에 font.ttf)
+        font_path = os.path.join(os.path.dirname(__file__), "font.ttf")
+        # 폰트를 fontManager에 추가 (matplotlib 3.8 이상에서 지원)
+        fm.fontManager.addfont(font_path)
         font_prop = fm.FontProperties(fname=font_path)
-        plt.rcParams["font.family"] = font_prop.get_name()  # font.ttf에 정의된 폰트 이름 사용
+        plt.rcParams["font.family"] = font_prop.get_name()
         plt.rcParams["axes.unicode_minus"] = False
+
 
         # 2. 그래프 그리기
         plt.figure(figsize=(6, 4))

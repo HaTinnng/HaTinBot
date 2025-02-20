@@ -451,7 +451,7 @@ class MiningSystem(commands.Cog):
             for mineral, qty in collected_this_cycle.items():
                 profile["inventory"][mineral] = profile["inventory"].get(mineral, 0) + qty
             # 경험치 부여: 기본 xp (랜덤 10~25) * 등급 xp 배율 (첫 드랍의 등급 사용)
-            base_xp = random.randint(10, 25)
+            base_xp = random.randint(40, 75)
             if drops:
                 grade = drops[0][2]
                 xp_multiplier = MINERAL_GRADES[grade]["xp_multiplier"]

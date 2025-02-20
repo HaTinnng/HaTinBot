@@ -612,66 +612,51 @@ class MiningSystem(commands.Cog):
         await ctx.send(embed=embed)
     
     # --------------------------
-    # 광물 판매 명령어 (등급 적용, 전체 판매 지원)
+    # 광물 판매 명령어 (모든 광물을 판매, 등급 적용)
     # --------------------------
     @commands.command(name="광물판매")
-    async def sell_minerals(self, ctx, *, args: str):
+    async def sell_minerals(self, ctx):
         """
-        #광물판매 [광물이름] [수량]:
-        보유한 광물을 판매하여 루찌를 획득합니다.
-        광물 이름에는 등급이 포함되어야 합니다. 예: "철 (S)"
-        만약 [수량]에 "다" 또는 "전부"가 입력되면 인벤토리 내 모든 해당 광물을 판매합니다.
-        (판매 가격은 SALE_PRICES에 등급 판매 배율을 곱하여 계산됩니다.)
+        #광물판매:
+        인벤토리 내 모든 광물을 판매하여 루찌를 획득합니다.
+        판매 가격은 SALE_PRICES에 등급 판매 배율을 곱하여 계산됩니다.
         """
-        args = args.strip()
         user_id = str(ctx.author.id)
         profile = self.get_user_profile(user_id)
         if not profile:
             await ctx.send(f"{ctx.author.mention} 게임을 시작하려면 #광산시작 명령어를 사용하세요!")
             return
 
-        parts = args.rsplit(" ", 1)
-        if len(parts) != 2:
-            await ctx.send(f"{ctx.author.mention} 올바른 형식으로 입력해주세요. 예: #광물판매 철 (S) 1")
-            return
-        mineral_input, quantity_str = parts
         inventory = profile.get("inventory", {})
-        if quantity_str in ["다", "전부"]:
-            if mineral_input not in inventory:
-                await ctx.send(f"{ctx.author.mention} 보유한 {mineral_input}이(가) 없습니다.")
-                return
-            quantity = inventory[mineral_input]
-        else:
-            try:
-                quantity = int(quantity_str)
-            except ValueError:
-                await ctx.send(f"{ctx.author.mention} 수량은 정수로 입력해주세요.")
-                return
-            if mineral_input not in inventory or inventory[mineral_input] < quantity:
-                await ctx.send(f"{ctx.author.mention} 보유한 {mineral_input} 수량이 부족합니다.")
-                return
-
-        match = re.match(r"(.+?) \((.+?)\)$", mineral_input)
-        if match:
-            base_mineral = match.group(1).strip()
-            grade = match.group(2).strip()
-        else:
-            base_mineral = mineral_input
-            grade = "D"
-        if base_mineral not in SALE_PRICES:
-            await ctx.send(f"{ctx.author.mention} {base_mineral}은(는) 판매할 수 없는 광물입니다.")
+        if not inventory:
+            await ctx.send(f"{ctx.author.mention} 인벤토리가 비어 있습니다.")
             return
-        multiplier = MINERAL_GRADES.get(grade, {"sale_multiplier": 1.0})["sale_multiplier"]
-        unit_price = SALE_PRICES[base_mineral] * multiplier
-        total_earnings = int(unit_price * quantity)
-        inventory[mineral_input] -= quantity
-        if inventory[mineral_input] <= 0:
+
+        total_earnings = 0
+        sold_details = ""
+        # 인벤토리의 모든 광물을 순회하며 판매 진행
+        for mineral_input, quantity in list(inventory.items()):
+            match = re.match(r"(.+?) \((.+?)\)$", mineral_input)
+            if match:
+                base_mineral = match.group(1).strip()
+                grade = match.group(2).strip()
+            else:
+                base_mineral = mineral_input
+                grade = "D"
+            if base_mineral not in SALE_PRICES:
+                continue  # 판매할 수 없는 광물은 건너뜁니다.
+            multiplier = MINERAL_GRADES.get(grade, {"sale_multiplier": 1.0})["sale_multiplier"]
+            unit_price = SALE_PRICES[base_mineral] * multiplier
+            earnings = int(unit_price * quantity)
+            total_earnings += earnings
+            sold_details += f"{mineral_input}: {quantity}개 => {earnings} 루찌\n"
             del inventory[mineral_input]
+        
         profile["inventory"] = inventory
         profile["루찌"] = profile.get("루찌", 0) + total_earnings
         self.update_user_profile(user_id, profile)
-        await ctx.send(f"{ctx.author.mention} {mineral_input} {quantity}개를 판매하여 {total_earnings} 루찌를 획득했습니다.")
-    
+        await ctx.send(f"{ctx.author.mention} 모든 광물을 판매하여 총 {total_earnings} 루찌를 획득했습니다.\n{sold_details}")
+
     # --------------------------
     # 장비 강화 명령어 (광물 요구사항 제거, 최대 Lv.20, 하락 확률 적용)
     # --------------------------
@@ -770,7 +755,6 @@ class MiningSystem(commands.Cog):
         profile["inventory_capacity"] += 1
         self.update_user_profile(user_id, profile)
         await ctx.send(f"{ctx.author.mention} 인벤토리 용량이 {current_capacity}에서 {profile['inventory_capacity']}로 증가하였습니다! (소요 루찌: {cost})")
-
 
 async def setup(bot):
     await bot.add_cog(MiningSystem(bot))

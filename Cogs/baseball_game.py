@@ -18,7 +18,7 @@ class BaseballGame(commands.Cog):
         self.sessions[ctx.channel.id] = {"answer": answer, "attempts": 0}
         await ctx.send("야구게임 시작! 4자리 숫자를 입력하세요. (종료하려면 `#야구게임그만` 입력)")
 
-    @commands.command(name="야구게임")
+    @commands.command(name="야구")
     async def play_game(self, ctx, guess: str):
         """
         플레이어의 입력을 받아 결과를 출력합니다.

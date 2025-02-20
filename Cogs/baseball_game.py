@@ -52,25 +52,20 @@ class BaseballGame(commands.Cog):
             await ctx.send(f"홈런! {attempts}번만에 맞추셨습니다!")
             return
 
-        # 스트라이크와 볼 계산
+        # 스트라이크 계산: 같은 자리에서 동일한 숫자인 경우
         strikes = sum(1 for i in range(4) if guess[i] == answer[i])
+        # 볼 계산: 두 문자열에 공통으로 등장하는 숫자의 최소 개수에서 스트라이크 수를 뺀 값
         guess_count = Counter(guess)
         answer_count = Counter(answer)
         common = sum(min(guess_count[d], answer_count[d]) for d in guess_count)
         balls = common - strikes
 
-        # 결과 메시지 구성 (아웃 처리 포함)
-        if strikes == 0 and balls == 0:
-            result = "아웃"
-        else:
-            parts = []
-            if strikes:
-                parts.append(f"{strikes} 스트라이크")
-            if balls:
-                parts.append(f"{balls} 볼")
-            result = ", ".join(parts)
+        # 아웃 계산: 4자리에서 스트라이크와 볼의 합을 뺀 값
+        outs = 4 - (strikes + balls)
 
-        await ctx.send(result)
+        # 결과 메시지를 각 항목별로 출력 (예: "1 스트라이크\n0 볼\n3 아웃")
+        result_message = f"{strikes} 스트라이크\n{balls} 볼\n{outs} 아웃"
+        await ctx.send(result_message)
 
 async def setup(bot):
     await bot.add_cog(BaseballGame(bot))

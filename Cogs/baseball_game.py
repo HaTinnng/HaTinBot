@@ -10,7 +10,7 @@ class BaseballGame(commands.Cog):
     @commands.command(name="야구게임")
     async def start_baseball_game(self, ctx, digits: int = 4):
         """
-        #야구게임 [자릿수]: 컴퓨터가 랜덤으로 만든 숫자를 맞추는 야구 게임을 시작합니다.
+        #야구게임 [자릿수]: 컴퓨터가 중복 없는 랜덤 숫자를 생성하여 맞추는 야구 게임을 시작합니다.
         자릿수는 2부터 5까지 선택 가능 (기본값은 4자리).
         """
         # 자릿수 유효성 검사
@@ -18,11 +18,16 @@ class BaseballGame(commands.Cog):
             await ctx.send("⚠️ 게임 자릿수는 2부터 5까지 가능합니다. 기본값인 4자리로 진행합니다.")
             digits = 4
 
-        # 0~9까지 숫자 중 랜덤으로 digits자리 숫자 생성 (중복 가능, 앞자리가 0이어도 상관없음)
-        secret_number = ''.join(str(random.randint(0, 9)) for _ in range(digits))
+        # 0~9까지 숫자 중 중복 없이 랜덤으로 digits자리 숫자 생성
+        secret_number = ''.join(str(num) for num in random.sample(range(10), digits))
         attempts = 0
 
-        await ctx.send(f"🔢 **숫자 야구 게임**을 시작합니다!\n**{digits}자리 숫자**를 맞춰보세요.\n(게임 중단: `#야구게임그만` 입력)")
+        await ctx.send(
+            f"🔢 **숫자 야구 게임**을 시작합니다!\n"
+            f"**{digits}자리 숫자**를 맞춰보세요.\n"
+            f"(게임 중단: `#야구게임그만` 입력)\n"
+            f"*각 자리는 중복되지 않습니다.*"
+        )
 
         def check(message):
             return message.author == ctx.author and message.channel == ctx.channel
@@ -76,7 +81,7 @@ class BaseballGame(commands.Cog):
         """
         help_text = (
             "🔢 **숫자 야구 게임 도움말** 🔢\n\n"
-            "컴퓨터가 랜덤으로 생성한 숫자를 맞추는 게임입니다.\n\n"
+            "컴퓨터가 중복 없는 숫자를 생성하여 맞추는 게임입니다.\n\n"
             "**사용법:**\n"
             "• `#야구게임 [자릿수]` - 게임을 시작합니다. (자릿수는 2부터 5까지 선택 가능, 기본값은 4자리)\n"
             "  ex) `#야구게임 3` (3자리 게임 시작)\n"

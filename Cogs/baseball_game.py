@@ -58,7 +58,6 @@ class BaseballGame(commands.Cog):
 
             outs = digits - (strikes + balls)
 
-            # 완전 일치하면 게임 종료
             if strikes == digits:
                 await ctx.send(f"🎉 **홈런!** 🎉\n{attempts}번 만에 정답을 맞추셨습니다!")
                 break
@@ -69,6 +68,27 @@ class BaseballGame(commands.Cog):
                     f"❌ **아웃:** {outs}"
                 )
                 await ctx.send(result_message)
+
+    @commands.command(name="야구")
+    async def baseball_help(self, ctx):
+        """
+        #야구: 숫자 야구 게임에 대한 도움말을 출력합니다.
+        """
+        help_text = (
+            "🔢 **숫자 야구 게임 도움말** 🔢\n\n"
+            "컴퓨터가 랜덤으로 생성한 숫자를 맞추는 게임입니다.\n\n"
+            "**사용법:**\n"
+            "• `#야구게임 [자릿수]` - 게임을 시작합니다. (자릿수는 2부터 5까지 선택 가능, 기본값은 4자리)\n"
+            "  ex) `#야구게임 3` (3자리 게임 시작)\n"
+            "• 게임 도중 `#야구게임그만`을 입력하면 게임을 종료할 수 있습니다.\n\n"
+            "**게임 규칙:**\n"
+            "• **스트라이크:** 숫자와 자리가 모두 일치할 경우\n"
+            "• **볼:** 숫자는 맞지만 자리가 다를 경우\n"
+            "• **아웃:** 해당 숫자가 전혀 없을 경우\n\n"
+            "모든 숫자가 스트라이크이면 **홈런!**\n"
+            "즐겁게 플레이하세요! 🎉"
+        )
+        await ctx.send(help_text)
 
 async def setup(bot):
     await bot.add_cog(BaseballGame(bot))

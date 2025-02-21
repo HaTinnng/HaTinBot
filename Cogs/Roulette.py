@@ -114,7 +114,7 @@ class Roulette(commands.Cog):
             "❌": 32   # 32% (꽝)
         }
 
-        # 3개의 슬롯을 가중치에 따라 랜덤 선택
+        # 최종 슬롯 결과를 미리 결정
         symbols = random.choices(list(symbol_weights.keys()), weights=list(symbol_weights.values()), k=3)
         result = "".join(symbols)
 
@@ -160,12 +160,18 @@ class Roulette(commands.Cog):
         # 슬롯머신 돌리는 동안 애니메이션 효과 (메시지 업데이트 방식)
         spin_message = await ctx.send(embed=discord.Embed(title="슬롯머신 돌리는 중...", color=discord.Color.blue()))
         animation_rounds = 10
-        for _ in range(animation_rounds):
-            interim_symbols = random.choices(list(symbol_weights.keys()), weights=list(symbol_weights.values()), k=3)
+        for i in range(animation_rounds):
+            # 마지막 반복에서는 실제 결과를 사용
+            if i == animation_rounds - 1:
+                interim_symbols = symbols
+            else:
+                interim_symbols = random.choices(list(symbol_weights.keys()), weights=list(symbol_weights.values()), k=3)
             interim_embed = discord.Embed(title="슬롯머신 돌리는 중...", color=discord.Color.blue())
             interim_embed.add_field(name="🎰 진행중", value=f"`| {interim_symbols[0]} | {interim_symbols[1]} | {interim_symbols[2]} |`", inline=False)
             await spin_message.edit(embed=interim_embed)
-            await asyncio.sleep(0.3)
+            # 마지막 반복은 딜레이 없이 바로 결과로 전환
+            if i < animation_rounds - 1:
+                await asyncio.sleep(0.3)
 
         # 결과 메시지
         final_embed = discord.Embed(title="🎰 777 룰렛 결과 🎰", color=discord.Color.gold())

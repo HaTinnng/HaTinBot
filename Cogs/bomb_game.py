@@ -20,30 +20,33 @@ class BombGame(discord.ui.View):
             self.add_item(button)
 
     def make_callback(self, position: int):
-        """각 버튼에 개별 이벤트 추가"""
         async def callback(interaction: discord.Interaction):
-            if interaction.user != self.players[self.current_turn]:  # 본인 차례인지 확인
+            if interaction.user != self.players[self.current_turn]:
                 await interaction.response.send_message("🚫 지금은 당신의 턴이 아닙니다!", ephemeral=True)
                 return
 
-            button = self.children[position - 1]  # 눌린 버튼 객체
+            button = self.children[position - 1]
 
             # 폭탄을 눌렀다면 게임 종료
             if position == self.bomb_position:
-                await interaction.response.send_message(f"💥 {interaction.user.mention}님이 폭탄을 눌렀습니다! 게임 종료! 💣")
-                await interaction.message.delete()  # 게임 메시지 삭제
-                button.style = discord.ButtonStyle.danger  # 폭탄 버튼을 붉은 색으로 표시
+                bomb_msg = (f"💥 {interaction.user.mention}님이 폭탄을 눌렀습니다! "
+                            f"버튼 {self.bomb_position}번이 폭탄이었습니다! 게임 종료! 💣")
+                button.style = discord.ButtonStyle.danger  # 폭탄 버튼 붉은색으로 표시
                 button.disabled = True  # 폭탄 버튼 비활성화
+                await interaction.response.send_message(bomb_msg)
+                await interaction.message.edit(content=bomb_msg, view=self)
+                return  # 게임 종료 후 더 이상 진행하지 않음
             else:
                 await interaction.response.send_message(f"✅ {interaction.user.mention}님, 안전합니다! 😌", ephemeral=True)
                 self.current_turn = (self.current_turn + 1) % len(self.players)  # 다음 턴으로 이동
-                button.disabled = True  # 선택된 안전 버튼을 비활성화
+                button.disabled = True  # 선택된 안전 버튼 비활성화
 
             # 차례를 표시하는 메시지 업데이트
             await interaction.message.edit(view=self)
             await self.update_turn_message(interaction.message)
 
         return callback
+
 
     async def update_turn_message(self, message):
         """현재 차례인 플레이어를 메시지에 표시"""

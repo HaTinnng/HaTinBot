@@ -157,22 +157,27 @@ class Roulette(commands.Cog):
         # 데이터베이스에 반영
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_balance}})
 
-        # 슬롯머신 돌리는 동안 메시지 전송
-        loading_message = await ctx.send("⏳슬롯머신을 돌리고 있습니다...")
-        await asyncio.sleep(3)
-        await loading_message.delete()
+        # 슬롯머신 돌리는 동안 애니메이션 효과 (메시지 업데이트 방식)
+        spin_message = await ctx.send(embed=discord.Embed(title="슬롯머신 돌리는 중...", color=discord.Color.blue()))
+        animation_rounds = 10
+        for _ in range(animation_rounds):
+            interim_symbols = random.choices(list(symbol_weights.keys()), weights=list(symbol_weights.values()), k=3)
+            interim_embed = discord.Embed(title="슬롯머신 돌리는 중...", color=discord.Color.blue())
+            interim_embed.add_field(name="🎰 진행중", value=f"`| {interim_symbols[0]} | {interim_symbols[1]} | {interim_symbols[2]} |`", inline=False)
+            await spin_message.edit(embed=interim_embed)
+            await asyncio.sleep(0.3)
 
         # 결과 메시지
-        embed = discord.Embed(title="🎰 777 룰렛 결과 🎰", color=discord.Color.gold())
-        embed.add_field(name="🎲 룰렛 결과", value=f"`| {symbols[0]} | {symbols[1]} | {symbols[2]} |`", inline=False)
+        final_embed = discord.Embed(title="🎰 777 룰렛 결과 🎰", color=discord.Color.gold())
+        final_embed.add_field(name="🎲 룰렛 결과", value=f"`| {symbols[0]} | {symbols[1]} | {symbols[2]} |`", inline=False)
 
         if payout_multiplier > 0:
-            embed.add_field(name="🎉 당첨!", value=f"💰 {payout:,}원 획득! (배팅금 {bet_amount:,}원 × {payout_multiplier}배)", inline=False)
+            final_embed.add_field(name="🎉 당첨!", value=f"💰 {payout:,}원 획득! (배팅금 {bet_amount:,}원 × {payout_multiplier}배)", inline=False)
         else:
-            embed.add_field(name="💸 꽝!", value=f"😭 {bet_amount:,}원을 잃었습니다!", inline=False)
+            final_embed.add_field(name="💸 꽝!", value=f"😭 {bet_amount:,}원을 잃었습니다!", inline=False)
 
-        embed.add_field(name="💰 현재 잔액", value=f"{new_balance:,}원", inline=False)
-        await ctx.send(embed=embed)
+        final_embed.add_field(name="💰 현재 잔액", value=f"{new_balance:,}원", inline=False)
+        await spin_message.edit(embed=final_embed)
 
 async def setup(bot):
     await bot.add_cog(Roulette(bot))

@@ -13,7 +13,7 @@ import matplotlib.font_manager as fm
 # ===== 상수 설정 =====
 JOIN_BONUS = 750000         # 참가 시 지급 자금 (750,000원)
 DEFAULT_MONEY = 750000      # 시즌 초기화 후 유저 기본 잔액 (800,000원)
-SUPPORT_AMOUNT = 50000  # 지원금 5만원
+SUPPORT_AMOUNT = 30000  # 지원금 5만원
 # MongoDB URI는 클라우드에서 비밀변수 MONGODB_URI를 통해 불러옵니다.
 MONGO_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "stock_game"
@@ -908,33 +908,48 @@ class StockMarket(commands.Cog):
     @commands.command(name="주식지원금", aliases=["지원금"])
     async def stock_support(self, ctx):
         """
-        #주식지원금: 하루에 한 번 50,000원의 지원금을 받을 수 있습니다.
-        (한국 시간 00:00에 초기화)
+        #주식지원금: 하루에 0시와 12시마다 지원금(30,000원)을 받을 수 있습니다.
+        마지막 지원 시각이 현재 기간(0시~11시59분 또는 12시~23시59분)보다 이전이면 지원금을 지급합니다.
         """
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
-
         if not user:
             await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가` 명령어로 참가해주세요.")
             return
 
-        now = self.get_seoul_time()
-        last_support_str = user.get("last_support", None)
+        tz = pytz.timezone("Asia/Seoul")
+        now = datetime.now(tz)
 
+        # 현재 시간이 어느 기간에 속하는지 판별합니다.
+        # 0시부터 11시59분이면 period_reset은 오늘 0시, 12시부터 23시59분이면 오늘 12시로 지정합니다.
+        if now.hour < 12:
+            period_reset = tz.localize(datetime(now.year, now.month, now.day, 0, 0, 0))
+        else:
+            period_reset = tz.localize(datetime(now.year, now.month, now.day, 12, 0, 0))
+
+        # 마지막 지원 시각을 확인합니다.
+        last_support_str = user.get("last_support_time", None)
+        last_support = None
         if last_support_str:
-            last_support = datetime.strptime(last_support_str, "%Y-%m-%d")
-            if last_support.date() == now.date():
-                await ctx.send(f"{ctx.author.mention}님, 오늘의 지원금을 이미 받았습니다! 내일 다시 시도해주세요.")
-                return
+            try:
+                # DB에 저장된 문자열은 "YYYY-MM-DD HH:MM:SS" 형식입니다.
+                last_support = tz.localize(datetime.strptime(last_support_str, "%Y-%m-%d %H:%M:%S"))
+            except Exception:
+                last_support = None
 
-        # 지원금 지급
+        # 만약 이번 기간(0시 또는 12시 이후)에 이미 지원금을 받았다면 지급하지 않습니다.
+        if last_support is not None and last_support >= period_reset:
+            await ctx.send(f"{ctx.author.mention}님, 이번 기간에는 이미 지원금을 받으셨습니다!")
+            return
+
+        # 지원금 지급: 잔액 업데이트 후 현재 시각을 기록합니다.
         new_money = user.get("money", 0) + SUPPORT_AMOUNT
         self.db.users.update_one(
             {"_id": user_id},
-            {"$set": {"money": new_money, "last_support": now.strftime("%Y-%m-%d")}}
+            {"$set": {"money": new_money, "last_support_time": now.strftime("%Y-%m-%d %H:%M:%S")}}
         )
 
-        await ctx.send(f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원") 
+        await ctx.send(f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원")
 
     @commands.command(name="유저데이터삭제", aliases=["유저삭제"])
     @commands.is_owner()

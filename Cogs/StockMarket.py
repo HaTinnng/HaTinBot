@@ -857,8 +857,13 @@ class StockMarket(commands.Cog):
                 va="center",
                 fontsize=10
             )
-        # x축 눈금을 1부터 시작하는 정수로 설정
-        plt.xticks(range(len(history)), range(1, len(history) + 1))
+        # x축 눈금을 -4부터 0까지로 설정 (최근 5회 측정 기준)
+        # history의 길이가 5인 경우, 왼쪽부터 -4, -3, -2, -1, 0 으로 표시합니다.
+        if len(history) == 5:
+            plt.xticks(range(len(history)), [-4, -3, -2, -1, 0])
+        else:
+            # history의 길이가 다를 경우 동적으로 계산
+            plt.xticks(range(len(history)), range(-len(history)+1, 1))
 
         # 그래프를 이미지로 저장 후 Discord에 전송
         buffer = io.BytesIO()

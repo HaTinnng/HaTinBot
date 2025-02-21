@@ -1,4 +1,4 @@
-ㅍimport discord
+import discord
 import random
 import asyncio  # asyncio 모듈 추가
 from discord.ext import commands

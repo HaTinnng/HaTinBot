@@ -38,8 +38,8 @@ class MiningHelp(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="#광물판매 [광물이름] [수량]",
-            value="보유한 광물을 판매하여 루찌를 획득합니다.",
+            name="#광물판매",
+            value="보유한 광물을 모두 판매하여 루찌를 획득합니다.",
             inline=False
         )
         embed.add_field(

@@ -49,7 +49,7 @@ class StockHelp(commands.Cog):
             "`#시즌` - 현재 시즌 정보 및 종료 시각을 확인합니다.\n"
         ), inline=False)
 
-        embed.set_footer(text="📢 최신 업데이트: #업데이트를 확인해주세요!
+        embed.set_footer(text="📢 최신 업데이트: #업데이트를 확인해주세요!")
 
         await ctx.send(embed=embed)
 

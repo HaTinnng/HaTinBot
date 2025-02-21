@@ -12,13 +12,6 @@ class BombGame(discord.ui.View):
         self.bomb_position = random.randint(1, num_buttons)  # 랜덤 폭탄 위치
         self.create_buttons()
 
-    def create_buttons(self):
-        """동적으로 n개의 버튼을 생성"""
-        for i in range(1, self.num_buttons + 1):
-            button = discord.ui.Button(label=f"{i}번", style=discord.ButtonStyle.primary)
-            button.callback = self.make_callback(i)  # 버튼 클릭 이벤트 설정
-            self.add_item(button)
-
     def make_callback(self, position: int):
         async def callback(interaction: discord.Interaction):
             if interaction.user != self.players[self.current_turn]:
@@ -27,25 +20,30 @@ class BombGame(discord.ui.View):
 
             button = self.children[position - 1]
 
-            # 폭탄을 눌렀다면 게임 종료
+            # 폭탄을 눌렀을 경우: 폭탄 결과 메시지를 전송하고 게임 메시지를 삭제
             if position == self.bomb_position:
-                bomb_msg = (f"💥 {interaction.user.mention}님이 폭탄을 눌렀습니다! "
-                            f"버튼 {self.bomb_position}번이 폭탄이었습니다! 게임 종료! 💣")
-                button.style = discord.ButtonStyle.danger  # 폭탄 버튼 붉은색으로 표시
+                bomb_msg = (
+                    f"💥 {interaction.user.mention}님이 폭탄을 눌렀습니다! "
+                    f"버튼 {self.bomb_position}번이 폭탄이었습니다! 게임 종료! 💣"
+                )
+                button.style = discord.ButtonStyle.danger  # 폭탄 버튼 붉은색 표시
                 button.disabled = True  # 폭탄 버튼 비활성화
                 await interaction.response.send_message(bomb_msg)
-                await interaction.message.edit(content=bomb_msg, view=self)
-                return  # 게임 종료 후 더 이상 진행하지 않음
+                await interaction.message.delete()  # 게임 메시지 삭제
+                return
+
+            # 안전 버튼을 눌렀을 경우
             else:
                 await interaction.response.send_message(f"✅ {interaction.user.mention}님, 안전합니다! 😌", ephemeral=True)
-                self.current_turn = (self.current_turn + 1) % len(self.players)  # 다음 턴으로 이동
-                button.disabled = True  # 선택된 안전 버튼 비활성화
+                self.current_turn = (self.current_turn + 1) % len(self.players)
+                button.disabled = True
 
-            # 차례를 표시하는 메시지 업데이트
+            # 업데이트: 버튼 상태와 현재 턴 표시
             await interaction.message.edit(view=self)
             await self.update_turn_message(interaction.message)
 
         return callback
+
 
 
     async def update_turn_message(self, message):

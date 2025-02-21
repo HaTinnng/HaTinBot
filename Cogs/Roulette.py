@@ -1,4 +1,4 @@
-import discord
+ㅍimport discord
 import random
 import asyncio  # asyncio 모듈 추가
 from discord.ext import commands
@@ -149,7 +149,7 @@ class Roulette(commands.Cog):
             elif symbols.count("🍀") == 2:
                 payout_multiplier = 2   # 🍀이 2개 → 2배
             elif symbols.count("🔔") == 2:
-                payout_multiplier = 1 # 🔔이 2개 → 1배    
+                payout_multiplier = 1   # 🔔이 2개 → 1배    
 
         payout = bet_amount * payout_multiplier  # 지급 금액 계산
         new_balance = user["money"] - bet_amount + payout  # 배팅 금액 차감 후 계산
@@ -161,7 +161,7 @@ class Roulette(commands.Cog):
         spin_message = await ctx.send(embed=discord.Embed(title="슬롯머신 돌리는 중...", color=discord.Color.blue()))
         animation_rounds = 10
         for i in range(animation_rounds):
-            # 마지막 반복에서는 실제 결과를 사용
+            # 10번째 회전은 미리 결정한 최종 결과를 사용
             if i == animation_rounds - 1:
                 interim_symbols = symbols
             else:
@@ -169,13 +169,11 @@ class Roulette(commands.Cog):
             interim_embed = discord.Embed(title="슬롯머신 돌리는 중...", color=discord.Color.blue())
             interim_embed.add_field(name="🎰 진행중", value=f"`| {interim_symbols[0]} | {interim_symbols[1]} | {interim_symbols[2]} |`", inline=False)
             await spin_message.edit(embed=interim_embed)
+            # 마지막 회전 이후에는 바로 결과를 출력 (딜레이 없음)
             if i < animation_rounds - 1:
                 await asyncio.sleep(0.3)
-        
-        # 애니메이션 루프가 끝난 후 0.3초 대기
-        await asyncio.sleep(0.3)
 
-        # 결과 메시지
+        # 10번째 회전이 완료되면 바로 결과 메시지 출력
         final_embed = discord.Embed(title="🎰 777 룰렛 결과 🎰", color=discord.Color.gold())
         final_embed.add_field(name="🎲 룰렛 결과", value=f"`| {symbols[0]} | {symbols[1]} | {symbols[2]} |`", inline=False)
 

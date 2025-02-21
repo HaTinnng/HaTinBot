@@ -954,7 +954,10 @@ class StockMarket(commands.Cog):
             {"$set": {"money": new_money, "last_support_time": now.strftime("%Y-%m-%d %H:%M:%S")}}
         )
 
-        await ctx.send(f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원")
+        await ctx.send(
+            f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원\n"
+            f"지원금은 매일 0시, 12시에 초기화됩니다."
+        )
 
     @commands.command(name="유저데이터삭제", aliases=["유저삭제"])
     @commands.is_owner()

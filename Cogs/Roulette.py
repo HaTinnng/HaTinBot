@@ -170,11 +170,10 @@ class Roulette(commands.Cog):
             interim_embed.add_field(name="🎰 진행중", value=f"`| {interim_symbols[0]} | {interim_symbols[1]} | {interim_symbols[2]} |`", inline=False)
             await spin_message.edit(embed=interim_embed)
             if i < animation_rounds - 1:
-                # 만약 이번이 펜타임(애니메이션의 바로 전 단계)라면 딜레이를 없애서 바로 최종 결과로 전환
-                if i == animation_rounds - 2:
-                    await asyncio.sleep(0)
-                else:
-                    await asyncio.sleep(0.3)
+                await asyncio.sleep(0.3)
+        
+        # 애니메이션 루프가 끝난 후 0.3초 대기
+        await asyncio.sleep(0.3)
 
         # 결과 메시지
         final_embed = discord.Embed(title="🎰 777 룰렛 결과 🎰", color=discord.Color.gold())

@@ -11,7 +11,7 @@ import matplotlib.ticker as ticker
 import matplotlib.font_manager as fm
 
 # ===== 상수 설정 =====
-JOIN_BONUS = 800000         # 참가 시 지급 자금 (800,000원)
+JOIN_BONUS = 750000         # 참가 시 지급 자금 (750,000원)
 DEFAULT_MONEY = 750000      # 시즌 초기화 후 유저 기본 잔액 (800,000원)
 SUPPORT_AMOUNT = 50000  # 지원금 5만원
 # MongoDB URI는 클라우드에서 비밀변수 MONGODB_URI를 통해 불러옵니다.

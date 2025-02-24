@@ -561,7 +561,7 @@ class StockMarket(commands.Cog):
             self.db.stocks.insert_one(stock)
         await ctx.send("주식 게임이 초기화되었습니다. (칭호는 유지됩니다.)")
 
-    @commands.command(name="주식", aliases=["주식목록", "현재가", "가격"])
+    @commands.command(name="주식", aliases=["주식목록", "현재가", "가격","주가"])
     async def show_stocks(self, ctx):
         """
         #주식:
@@ -1520,7 +1520,7 @@ class StockMarket(commands.Cog):
         except Exception as e:
             await ctx.send(f"메시지 전송 오류: {e}")
 
-    @commands.command(name="대출상환")
+    @commands.command(name="대출상환", aliases=["상환"])
     async def repay_loan(self, ctx, amount: str):
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})

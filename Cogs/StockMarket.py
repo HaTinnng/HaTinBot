@@ -217,6 +217,32 @@ def init_stocks():
     return stocks
 
 # ===== Discord Cog: StockMarket =====
+class LoanConfirmationView(discord.ui.View):
+    def __init__(self, author: discord.Member, timeout=30):
+        super().__init__(timeout=timeout)
+        self.author = author
+        self.value = None  # True: 대출 진행, False: 취소
+
+    @discord.ui.button(label="대출하기", style=discord.ButtonStyle.success)
+    async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # 명령어를 실행한 사용자만 버튼 사용 가능
+        if interaction.user != self.author:
+            await interaction.response.send_message("이 버튼은 명령어를 입력한 본인만 사용할 수 있습니다.", ephemeral=True)
+            return
+        self.value = True
+        self.stop()
+        await interaction.response.send_message("대출을 진행합니다.", ephemeral=True)
+
+    @discord.ui.button(label="그만두기", style=discord.ButtonStyle.danger)
+    async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
+        # 명령어를 실행한 사용자만 버튼 사용 가능
+        if interaction.user != self.author:
+            await interaction.response.send_message("이 버튼은 명령어를 입력한 본인만 사용할 수 있습니다.", ephemeral=True)
+            return
+        self.value = False
+        self.stop()
+        await interaction.response.send_message("대출이 취소되었습니다.", ephemeral=True)
+
 class StockMarket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -1412,32 +1438,20 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="대출")
     async def take_loan(self, ctx, amount: str):
-        # 1. 시즌(거래 가능 시간) 체크
-        try:
-            if not self.is_trading_open():
-                await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
-                return
-        except Exception as e:
-            await ctx.send(f"시즌 체크 오류: {e}")
+        # 1. 거래 가능 시간(시즌) 체크
+        if not self.is_trading_open():
+            await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
             return
 
         # 2. 사용자 조회
-        try:
-            user_id = str(ctx.author.id)
-            user = self.db.users.find_one({"_id": user_id})
-            if not user:
-                await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
-                return
-        except Exception as e:
-            await ctx.send(f"사용자 조회 오류: {e}")
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
             return
 
         # 3. 대출 이자 업데이트
-        try:
-            current_loan = self.update_loan_interest(user)
-        except Exception as e:
-            await ctx.send(f"대출 이자 업데이트 오류: {e}")
-            return
+        current_loan = self.update_loan_interest(user)
 
         max_loan = 500000  # 최대 대출 한도
 
@@ -1453,8 +1467,8 @@ class StockMarket(commands.Cog):
                 if loan_amount <= 0:
                     await ctx.send("대출 금액은 1원 이상이어야 합니다.")
                     return
-        except Exception as e:
-            await ctx.send(f"대출 금액 처리 오류: {e}")
+        except Exception:
+            await ctx.send("대출 금액을 올바르게 입력해주세요.")
             return
 
         if current_loan + loan_amount > max_loan:
@@ -1462,24 +1476,27 @@ class StockMarket(commands.Cog):
             await ctx.send(f"대출 한도는 총 {max_loan:,}원입니다. 현재 대출 잔액: {current_loan:,}원. 추가로 {available:,}원만 대출 가능합니다.")
             return
 
-        # 5. 사용자 대출 및 현금 정보 업데이트
-        try:
-            new_loan = current_loan + loan_amount
-            new_money = user.get("money", 0) + loan_amount
-            loan_update = {
-                "amount": new_loan,
-                "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
-        except Exception as e:
-            await ctx.send(f"대출 정보 업데이트 오류: {e}")
+        # 5. 대출 진행 전 경고 메시지와 버튼 띄우기
+        view = LoanConfirmationView(author=ctx.author, timeout=30)
+        await ctx.send("⚠️ **대출을 진행하시겠습니까?**\n아래 버튼에서 선택해주세요.", view=view)
+        await view.wait()
+    
+        if view.value is None:
+            await ctx.send("대출 시간이 만료되었습니다. 대출이 취소됩니다.")
+            return
+        if not view.value:
+            await ctx.send("대출이 취소되었습니다.")
             return
 
-        # 6. 성공 메시지 전송
-        try:
-            await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원의 대출을 받았습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
-        except Exception as e:
-            await ctx.send(f"메시지 전송 오류: {e}")
+        # 6. 사용자 대출 및 현금 정보 업데이트
+        new_loan = current_loan + loan_amount
+        new_money = user.get("money", 0) + loan_amount
+        loan_update = {
+            "amount": new_loan,
+            "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
+        await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원의 대출을 받았습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
 
     @commands.command(name="대출상환")
     async def repay_loan(self, ctx, amount: str):

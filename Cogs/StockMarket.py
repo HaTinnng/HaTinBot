@@ -235,7 +235,7 @@ class StockMarket(commands.Cog):
             {"loan": {"$exists": False}},
             {"$set": {"loan": {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")}}}
         )
-        
+
         # season 컬렉션 (단일 문서 _id="season") 초기화
         if self.db.season.find_one({"_id": "season"}) is None:
             season_doc = {
@@ -420,18 +420,23 @@ class StockMarket(commands.Cog):
 
     async def process_season_end(self, now):
         """
-        시즌 종료 시 모든 유저의 자산(현금 + 보유 주식 평가액)을 산출하여 상위 3명에게
+        시즌 종료 시 모든 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 산출하여 상위 3명에게
         칭호("YYYY 시즌N TOP{순위}")를 부여한 후, 유저 자산과 주식 데이터를 초기화합니다.
         또한, 시즌 종료 시 TOP3 기록과 함께 시즌 진행 기간을 season_results 컬렉션에 저장합니다.
         """
         ranking = []
         for user in self.db.users.find({}):
-            total = user.get("money", DEFAULT_MONEY)
+            # 현금과 예금 포함
+            total = user.get("money", DEFAULT_MONEY) + user.get("bank", 0)
             portfolio = user.get("portfolio", {})
             for sid, holding in portfolio.items():
                 stock = self.db.stocks.find_one({"_id": sid})
                 if stock:
                     total += stock["price"] * holding.get("amount", 0)
+            # 대출금 차감 (있다면)
+            loan_info = user.get("loan")
+            if loan_info and isinstance(loan_info, dict):
+                total -= loan_info.get("amount", 0)
             ranking.append((user["_id"], total))
         ranking.sort(key=lambda x: x[1], reverse=True)
         season = self.db.season.find_one({"_id": "season"})
@@ -469,9 +474,9 @@ class StockMarket(commands.Cog):
                 if title not in titles:
                     titles.append(title)
                     self.db.users.update_one({"_id": user_id}, {"$set": {"titles": titles}})
-        
+
         # 유저 자산과 포트폴리오 초기화, 주식 데이터 초기화
-        self.db.users.update_many({}, {"$set": {"money": DEFAULT_MONEY, "portfolio": {}}})
+        self.db.users.update_many({}, {"$set": {"money": DEFAULT_MONEY, "bank": 0, "portfolio": {}}})
         self.db.stocks.delete_many({})
         stocks = init_stocks()
         for stock in stocks.values():
@@ -480,8 +485,6 @@ class StockMarket(commands.Cog):
             {"_id": "season"},
             {"$inc": {"season_no": 1}, "$set": {"last_reset": now.strftime("%Y-%m-%d %H:%M:%S")}}
         )
-
-
     # ===== 명령어들 =====
 
     @commands.command(name="주식참가", aliases=["주식참여", "주식시작"])

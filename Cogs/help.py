@@ -5,7 +5,7 @@ class Help(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="도움", aliases=["도움말", "헬프", "메딕"])
+    @commands.command(name="도움", aliases=["도움말", "헬프", "메딕", "명령어"])
     async def help_command(self, ctx):
         """
         봇의 도움말을 출력하는 명령어

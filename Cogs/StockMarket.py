@@ -332,6 +332,23 @@ class StockMarket(commands.Cog):
             
             self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": update_fields})
 
+    def update_loan_interest(self, user):
+        # 대출 정보가 없으면 초기값 설정
+        loan = user.get("loan", {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")})
+        last_update_str = loan.get("last_update")
+        try:
+            last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            last_update = self.get_seoul_time()
+        now = self.get_seoul_time()
+        days_passed = (now - last_update).days
+        if days_passed > 0 and loan["amount"] > 0:
+            new_amount = loan["amount"] * (1.01 ** days_passed)
+            loan["amount"] = int(new_amount)
+            loan["last_update"] = now.strftime("%Y-%m-%d %H:%M:%S")
+            self.db.users.update_one({"_id": user["_id"]}, {"$set": {"loan": loan}})
+        return loan["amount"]
+
     @tasks.loop(seconds=10)
     async def stock_update_loop(self):
         """
@@ -473,7 +490,9 @@ class StockMarket(commands.Cog):
             "username": username,
             "money": JOIN_BONUS,
             "portfolio": {},
-            "titles": []
+            "titles": [],
+            "bank": 0,  # 은행 예금 잔액
+            "loan": {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")}  # 대출 정보
         }
         self.db.users.insert_one(user_doc)
         await ctx.send(f"{ctx.author.mention}님, '{username}'이라는 이름으로 주식 게임에 참가하셨습니다! 초기 자금 {JOIN_BONUS}원을 지급받았습니다.")
@@ -753,9 +772,12 @@ class StockMarket(commands.Cog):
             portfolio = user.get("portfolio", {})
             for sid, holding in portfolio.items():
                 stock = self.db.stocks.find_one({"_id": sid})
-                if stock:
-                    total += stock["price"] * holding.get("amount", 0)
-            ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
+            if stock:
+                total += stock["price"] * holding.get("amount", 0)
+            # 대출금(빚)이 있으면 총 자산에서 차감
+        loan = user.get("loan", {"amount": 0}).get("amount", 0)
+        total -= loan
+        ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         msg_lines = ["**랭킹 TOP 10**"]
         for idx, (uid, total, uname) in enumerate(ranking_list[:10], start=1):
@@ -1321,6 +1343,129 @@ class StockMarket(commands.Cog):
                 view = SeasonResultsView(seasons, items_per_page)
                 content = view.get_page_content()
                 await ctx.send(content, view=view)
+
+    @commands.command(name="예금")
+    async def deposit(self, ctx, amount: str):
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
+            return
+        try:
+            if amount.lower() in ["all", "전부", "올인", "다", "풀예금"]:
+                deposit_amount = user["money"]
+            else:
+                deposit_amount = int(amount)
+                if deposit_amount <= 0:
+                    await ctx.send("예금액은 1원 이상이어야 합니다.")
+                    return
+        except Exception:
+            await ctx.send("예금액을 올바르게 입력해주세요.")
+            return
+        if user["money"] < deposit_amount:
+            await ctx.send("현금 잔액이 부족합니다.")
+            return
+        new_money = user["money"] - deposit_amount
+        new_bank = user.get("bank", 0) + deposit_amount
+        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "bank": new_bank}})
+        await ctx.send(f"{ctx.author.mention}님, {deposit_amount:,}원이 예금되었습니다. (은행 잔액: {new_bank:,}원, 현금: {new_money:,}원)")
+
+    @commands.command(name="출금")
+    async def withdraw(self, ctx, amount: str):
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
+            return
+        try:
+            if amount.lower() in ["all", "전부", "올인", "다", "풀출금"]:
+                withdraw_amount = user.get("bank", 0)
+            else:
+                withdraw_amount = int(amount)
+                if withdraw_amount <= 0:
+                    await ctx.send("출금액은 1원 이상이어야 합니다.")
+                    return
+        except Exception:
+            await ctx.send("출금액을 올바르게 입력해주세요.")
+            return
+        bank_balance = user.get("bank", 0)
+        if bank_balance < withdraw_amount:
+            await ctx.send("은행 잔액이 부족합니다.")
+            return
+        new_bank = bank_balance - withdraw_amount
+        new_money = user["money"] + withdraw_amount
+        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "bank": new_bank}})
+        await ctx.send(f"{ctx.author.mention}님, {withdraw_amount:,}원이 출금되었습니다. (은행 잔액: {new_bank:,}원, 현금: {new_money:,}원)")
+
+    @commands.command(name="대출")
+    async def take_loan(self, ctx, amount: str):
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
+            return
+        # 대출 이자 업데이트
+        current_loan = self.update_loan_interest(user)
+        max_loan = 500000  # 최대 대출 한도
+        try:
+            if amount.lower() in ["다", "all", "전부", "풀대출"]:
+                loan_amount = max_loan - current_loan
+                if loan_amount <= 0:
+                    await ctx.send("이미 최대 대출 한도에 도달했습니다.")
+                    return
+            else:
+                loan_amount = int(amount)
+                if loan_amount <= 0:
+                    await ctx.send("대출 금액은 1원 이상이어야 합니다.")
+                    return
+        except Exception:
+            await ctx.send("대출 금액을 올바르게 입력해주세요.")
+            return
+        if current_loan + loan_amount > max_loan:
+            available = max_loan - current_loan
+            await ctx.send(f"대출 한도는 총 {max_loan:,}원입니다. 현재 대출 잔액: {current_loan:,}원. 추가로 {available:,}원만 대출 가능합니다.")
+            return
+        new_loan = current_loan + loan_amount
+        new_money = user["money"] + loan_amount
+        loan_update = {
+            "amount": new_loan,
+            "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
+        await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원의 대출을 받았습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
+
+    @commands.command(name="대출상환")
+    async def repay_loan(self, ctx, amount: str):
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
+            return
+        current_loan = self.update_loan_interest(user)
+        try:
+            if amount.lower() in ["all", "전부", "올인", "다", "풀상환"]:
+                repay_amount = current_loan
+            else:
+                repay_amount = int(amount)
+                if repay_amount <= 0:
+                    await ctx.send("상환 금액은 1원 이상이어야 합니다.")
+                    return
+        except Exception:
+            await ctx.send("상환 금액을 올바르게 입력해주세요.")
+            return
+        if user["money"] < repay_amount:
+            await ctx.send("현금 잔액이 부족하여 대출 상환이 불가능합니다.")
+            return
+        if repay_amount > current_loan:
+            repay_amount = current_loan  # 초과 상환 방지
+        new_money = user["money"] - repay_amount
+        new_loan = current_loan - repay_amount
+        loan_update = {
+            "amount": new_loan,
+            "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
+        await ctx.send(f"{ctx.author.mention}님, {repay_amount:,}원을 대출 상환하였습니다. (남은 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

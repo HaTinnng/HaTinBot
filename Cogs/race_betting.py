@@ -155,16 +155,27 @@ class RaceBetting(commands.Cog):
     async def race_info(self, ctx):
         """
         #경마정보:
-        현재 진행 중인 경마 경기의 시작 시간과 참가 가능한 말 목록(번호, 이름, 배당률)을 보여줍니다.
+        현재 진행 중인 경마 경기의 시작 시간, 참가 가능한 말 목록(번호, 이름, 배당률)과
+        자동 경마 시작 예정 시간(한국시간 기준)을 보여줍니다.
         (경마 베팅은 시즌 기간에만 이용 가능합니다.)
         """
         if not self.is_race_available():
             await ctx.send("경마 베팅은 현재 시즌 기간에만 이용 가능합니다.")
             return
+
+        tz = pytz.timezone("Asia/Seoul")
+        now = datetime.now(tz)
+        # 자동 경마는 매일 18:00에 시작되므로, 다음 경마 시작 예정 시간을 계산합니다.
+        if now.hour < 18:
+            next_race_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
+        else:
+            next_race_time = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
+
         race = self.current_race
         msg_lines = [
             f"**현재 경마 경기 (Race ID: {race['race_id']})**",
             f"경기 시작 시간: {race['start_time'].strftime('%Y-%m-%d %H:%M:%S')}",
+            f"자동 경마 시작 예정 시간: {next_race_time.strftime('%Y-%m-%d %H:%M:%S')}",
             "참가 말 목록:"
         ]
         for horse in race["horses"]:
@@ -267,7 +278,7 @@ class RaceBetting(commands.Cog):
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
         bet_history = user.get("bet_history", []) if user else []
-        # race_id별로 사용자의 베팅 기록을 쉽게 조회하기 위해 딕셔너리 생성 (경기당 한 번의 베팅만 있다고 가정)
+        # 경기 당 한 번의 베팅만 있다고 가정하고, race_id별로 사용자의 베팅 기록을 딕셔너리로 만듭니다.
         user_bets = {record["race_id"]: record for record in bet_history}
         msg_lines = ["**최근 경마 결과:**"]
         for res in results:

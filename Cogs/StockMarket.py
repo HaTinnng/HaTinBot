@@ -307,7 +307,7 @@ class StockMarket(commands.Cog):
     
     def update_stocks(self):
         """
-        모든 주식의 가격을 21.58% ~ -18.32% 변동폭 내에서 변동합니다.
+        모든 주식의 가격을 21.58% ~ -17.32% 변동폭 내에서 변동합니다.
         가격이 13원 미만이 되면 상장폐지되며, 가격이 0원이 되고 변동이 중단됩니다.
         """
         if not self.is_trading_open():
@@ -321,7 +321,7 @@ class StockMarket(commands.Cog):
                 continue  # 변동을 적용하지 않음
             
             old_price = stock["price"]
-            percent_change = random.uniform(-18.32, 21.58)  # 모든 주식 동일 변동폭 적용
+            percent_change = random.uniform(-17.32, 21.58)  # 모든 주식 동일 변동폭 적용
             new_price = int(old_price * (1 + percent_change / 100))
             new_price = max(new_price, 1)
             
@@ -1399,6 +1399,9 @@ class StockMarket(commands.Cog):
             return
         try:
             if amount.lower() in ["all", "전부", "올인", "다", "풀예금"]:
+                if user["money"] == 0:
+                    await ctx.send("현금 잔액이 0원입니다.")
+                    return
                 deposit_amount = user["money"]
             else:
                 deposit_amount = int(amount)
@@ -1476,7 +1479,7 @@ class StockMarket(commands.Cog):
 
         # 4. 입력값 처리
         try:
-            if amount.lower() in ["다", "all", "전부", "풀대출"]:
+            if amount.lower() in ["다", "all", "전부", "풀대출", "올인인"]:
                 loan_amount = max_loan - current_loan
                 if loan_amount <= 0:
                     await ctx.send("이미 최대 대출 한도에 도달했습니다.")
@@ -1522,6 +1525,9 @@ class StockMarket(commands.Cog):
             await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
             return
         current_loan = self.update_loan_interest(user)
+        if current_loan == 0:
+            await ctx.send("대출금이 0원입니다.")
+            return
         try:
             if amount.lower() in ["all", "전부", "올인", "다", "풀상환"]:
                 repay_amount = current_loan

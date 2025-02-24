@@ -725,7 +725,7 @@ class StockMarket(commands.Cog):
             total_stock_value += stock_value
             avg_buy = round(holding.get("total_cost", 0) / amount, 2) if amount > 0 else 0
             portfolio_lines.append(
-                f"{stock.get('name', 'Unknown')}: {amount}주 (현재가: {current_price}원, 총액: {stock_value}원, 평균구매가: {avg_buy}원)"
+                f"{stock.get('name', 'Unknown')}: {amount}주 (현재가: {current_price:,}원, 총액: {stock_value:,}원, 평균구매가: {avg_buy:,}원)"
             )
         portfolio_str = "\n".join(portfolio_lines) if portfolio_lines else "보유 주식 없음"
         total_assets = user.get("money", DEFAULT_MONEY) + total_stock_value
@@ -733,9 +733,9 @@ class StockMarket(commands.Cog):
         username = user.get("username", ctx.author.display_name)
         msg = (
             f"**{username}님의 프로필**\n"
-            f"현금 잔액: {user['money']}원\n"
+            f"현금 잔액: {user['money']:,}원\n"
             f"보유 주식 총액: {total_stock_value}원\n"
-            f"전체 자산 (현금 + 주식): {total_assets}원\n\n"
+            f"전체 자산 (현금 + 주식): {total_assets:,}원\n\n"
             f"보유 주식:\n{portfolio_str}\n"
             f"칭호: {titles_str}"
         )

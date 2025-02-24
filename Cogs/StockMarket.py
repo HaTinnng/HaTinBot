@@ -955,7 +955,7 @@ class StockMarket(commands.Cog):
         )
 
         await ctx.send(
-            f"{ctx.author.mention}님, {SUPPORT_AMOUNT}원의 지원금을 받았습니다! 현재 잔액: {new_money}원\n"
+            f"{ctx.author.mention}님, {SUPPORT_AMOUNT:,}원의 지원금을 받았습니다! 현재 잔액: {new_money:,}원\n"
             f"지원금은 매일 0시, 12시에 초기화됩니다."
         )
 
@@ -996,7 +996,7 @@ class StockMarket(commands.Cog):
         }
         new_stock["history"].append(new_stock["price"])  # 최초 가격 기록 추가
         self.db.stocks.insert_one(new_stock)
-        await ctx.send(f"✅ 새로운 주식 `{stock_name}`이 추가되었습니다! 초기 가격: {new_stock['price']}원")
+        await ctx.send(f"✅ 새로운 주식 `{stock_name}`이 추가되었습니다! 초기 가격: {new_stock['price']:,}원")
 
     @commands.command(name="주식쿠폰입력")
     async def redeem_stock_coupon(self, ctx, coupon_code: str):
@@ -1043,7 +1043,7 @@ class StockMarket(commands.Cog):
         )
 
         await ctx.send(
-            f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{reward_amount}원`을 지급받았습니다.\n"
+            f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{reward_amount:,}원`을 지급받았습니다.\n"
             f"현재 잔액: `{new_money}원`\n"
             f"이 쿠폰은 총 {max_coupon_usage}회 사용 가능하며, 현재 사용 횟수: {coupon_usage[coupon_code]}회 사용했습니다."
         )
@@ -1239,7 +1239,7 @@ class StockMarket(commands.Cog):
                 f"기간: {season_doc.get('start_time', 'N/A')} ~ {season_doc.get('end_time', 'N/A')}"
             ]
             for entry in results:
-                lines.append(f"{entry['rank']}위: {entry['username']} - {entry['total_assets']}원")
+                lines.append(f"{entry['rank']}위: {entry['username']} - {entry['total_assets']:,}원")
             await ctx.send("\n".join(lines))
         else:
             # 저장된 시즌 목록 조회

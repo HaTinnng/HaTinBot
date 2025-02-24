@@ -779,7 +779,7 @@ class StockMarket(commands.Cog):
         """
         ranking_list = []
         for user in self.db.users.find({}):
-            total = user.get("money", DEFAULT_MONEY)
+            total = user.get("money", DEFAULT_MONEY) + user.get("bank", 0)
             portfolio = user.get("portfolio", {})
             for sid, holding in portfolio.items():
                 stock = self.db.stocks.find_one({"_id": sid})

@@ -43,35 +43,13 @@ class RaceBetting(commands.Cog):
     def ensure_race_participation(self, user):
         """
         주식 게임에 등록된 사용자에게 경마 참여용 닉네임(race_nickname)이 설정되어 있지 않다면,
-        자동으로 stock 게임의 username을 race_nickname으로 설정합니다.
+        자동으로 주식 게임의 username을 race_nickname으로 설정합니다.
         """
         if not user.get("race_nickname"):
             nickname = user.get("username", "Unknown")
             self.db.users.update_one({"_id": user["_id"]}, {"$set": {"race_nickname": nickname}})
             user["race_nickname"] = nickname
         return user
-
-    @commands.command(name="경마참가")
-    async def join_race(self, ctx, *, nickname: str = None):
-        """
-        #경마참가 [닉네임]:
-        주식 게임에 참가한 사용자가 경마 베팅 게임에 등록합니다.
-        별도로 등록하지 않아도 #주식참가를 한 사용자는 자동으로 경마에 참여됩니다.
-        이 명령어는 경마에서 사용할 닉네임을 설정/변경하는 용도로 사용됩니다.
-        """
-        user_id = str(ctx.author.id)
-        user = self.db.users.find_one({"_id": user_id})
-        if not user:
-            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가 [이름]`으로 먼저 참가해주세요.")
-            return
-
-        if nickname:
-            nickname = nickname.strip()
-        else:
-            nickname = user.get("username", ctx.author.display_name)
-
-        self.db.users.update_one({"_id": user_id}, {"$set": {"race_nickname": nickname}})
-        await ctx.send(f"{ctx.author.mention}님, 경마 베팅 게임에 '{nickname}' 닉네임으로 등록되었습니다. 현재 잔액: {user.get('money', 0):,}원")
 
     @commands.command(name="경마정보")
     async def race_info(self, ctx):

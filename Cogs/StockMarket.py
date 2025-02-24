@@ -476,7 +476,18 @@ class StockMarket(commands.Cog):
                     self.db.users.update_one({"_id": user_id}, {"$set": {"titles": titles}})
 
         # 유저 자산과 포트폴리오 초기화, 주식 데이터 초기화
-        self.db.users.update_many({}, {"$set": {"money": DEFAULT_MONEY, "bank": 0, "portfolio": {}}})
+        self.db.users.update_many(
+            {},
+            {"$set": {
+                "money": DEFAULT_MONEY,
+                "bank": 0,
+                "portfolio": {},
+                "loan": {
+                    "amount": 0,
+                    "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            }}
+        )
         self.db.stocks.delete_many({})
         stocks = init_stocks()
         for stock in stocks.values():

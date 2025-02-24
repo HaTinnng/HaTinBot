@@ -1073,6 +1073,7 @@ class StockMarket(commands.Cog):
         # 각 쿠폰 코드는 지급 금액과 최대 사용 횟수를 포함합니다.
         valid_coupons = {
             "2025Season1": {"reward": 300000, "max_usage": 1},
+            "dkslsoehs": {"reward": 18023566, "max_usage": 1},
             # "": {"reward": 200000, "max_usage": 2} 다음 원하는 거 추가
         }
 

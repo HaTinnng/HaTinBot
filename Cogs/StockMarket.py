@@ -1458,15 +1458,21 @@ class StockMarket(commands.Cog):
             await ctx.send(f"대출 한도는 총 {max_loan:,}원입니다. 현재 대출 잔액: {current_loan:,}원. 추가로 {available:,}원만 대출 가능합니다.")
             return
 
-        # 5. 경고 메시지 및 버튼 뷰 생성
-        view = LoanConfirmationView(self, user, loan_amount)
-        await ctx.send(
-            f"경고: 대출을 진행하면 하루 1% 복리 이자가 적용됩니다.\n"
-            f"대출 금액: {loan_amount:,}원\n"
-            f"현재 이자율: 1% (하루 기준)\n"
-            "진행하시겠습니까?",
-            view=view
-        )
+        try:
+            view = LoanConfirmationView(self, user, loan_amount)
+            print("버튼 뷰 생성 성공:", view)
+            await ctx.send(
+                f"경고: 대출을 진행하면 하루 1% 복리 이자가 적용됩니다.\n"
+                f"대출 금액: {loan_amount:,}원\n"
+             f"현재 이자율: 1% (하루 기준)\n"
+                "진행하시겠습니까?",
+                view=view
+            )
+            print("경고 메시지 및 버튼 뷰 전송 완료")
+        except Exception as e:
+            await ctx.send(f"버튼 뷰 생성 오류: {e}")
+            print("버튼 뷰 생성 오류:", e)
+            return
 
     class LoanConfirmationView(discord.ui.View):
         def __init__(self, cog, user, loan_amount, timeout=30):
@@ -1474,6 +1480,7 @@ class StockMarket(commands.Cog):
             self.cog = cog       # 대출 처리에 필요한 메서드와 DB 접근을 위해 Cog 참조
             self.user = user     # 현재 사용자 문서
             self.loan_amount = loan_amount
+            print("LoanConfirmationView 초기화됨")
 
         @discord.ui.button(label="대출하기", style=discord.ButtonStyle.primary)
         async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):

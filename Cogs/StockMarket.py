@@ -321,7 +321,7 @@ class StockMarket(commands.Cog):
                 continue  # 변동을 적용하지 않음
             
             old_price = stock["price"]
-            percent_change = random.uniform(-17.32, 21.58)  # 모든 주식 동일 변동폭 적용
+            percent_change = random.uniform(-18.32, 21.58)  # 모든 주식 동일 변동폭 적용
             new_price = int(old_price * (1 + percent_change / 100))
             new_price = max(new_price, 1)
             

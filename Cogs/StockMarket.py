@@ -541,7 +541,7 @@ class StockMarket(commands.Cog):
                 arrow = "⏺0"
             
             # 주식 정보 문자열 생성
-            stock_info = f"{arrow_change}**{stock['name']}**: `{stock['price']}원` ({arrow}) (변동율: `{stock['percent_change']}%`)"
+            stock_info = f"{arrow_change}**{stock['name']}**: `{stock['price']:,}원` ({arrow}) (변동율: `{stock['percent_change']}%`)"
             
             # 상장폐지된 주식은 전체를 취소선 처리
             if not stock.get("listed", True):

@@ -1428,6 +1428,9 @@ class StockMarket(commands.Cog):
             return
         try:
             if amount.lower() in ["all", "전부", "올인", "다", "풀출금"]:
+                if user.get("bank", 0) == 0:
+                    await ctx.send("예금액이 0원입니다.")
+                    return
                 withdraw_amount = user.get("bank", 0)
             else:
                 withdraw_amount = int(amount)

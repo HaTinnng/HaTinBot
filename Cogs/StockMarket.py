@@ -1410,9 +1410,9 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="대출")
     async def take_loan(self, ctx, amount: str):
-        # 시즌(거래 가능 기간)인지 먼저 체크
+        # 거래 가능 시간(시즌) 체크
         if not self.is_trading_open():
-            await ctx.send("대출 기능은 시즌 기간(거래 가능 시간)에서만 사용할 수 있습니다.")
+            await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
             return
 
         user_id = str(ctx.author.id)
@@ -1421,8 +1421,9 @@ class StockMarket(commands.Cog):
             await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
             return
 
-        # 대출 이자 업데이트
+        # 대출 이자 업데이트 (대출 이자가 복리로 적용되도록)
         current_loan = self.update_loan_interest(user)
+
         max_loan = 500000  # 최대 대출 한도
         try:
             if amount.lower() in ["다", "all", "전부", "풀대출"]:
@@ -1445,7 +1446,7 @@ class StockMarket(commands.Cog):
             return
 
         new_loan = current_loan + loan_amount
-        new_money = user["money"] + loan_amount
+        new_money = user.get("money", 0) + loan_amount
         loan_update = {
             "amount": new_loan,
             "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")

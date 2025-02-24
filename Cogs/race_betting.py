@@ -13,6 +13,11 @@ class RaceBetting(commands.Cog):
         self.mongo_client = MongoClient(os.environ.get("MONGODB_URI"))
         self.db = self.mongo_client["stock_game"]
         
+        # 경마 ID를 증가시키기 위한 변수
+        self.race_counter = 1
+        # 현재 시즌 식별자 저장 (예: "2025-02")
+        self.current_season = self.get_season_identifier()
+        
         # 현재 진행 중인 경마 경기 정보를 초기화합니다.
         self.current_race = self.init_race()
         # 자동 경마 시작 중복 실행 방지를 위한 변수
@@ -22,6 +27,33 @@ class RaceBetting(commands.Cog):
     def cog_unload(self):
         self.auto_race_loop.cancel()
         self.mongo_client.close()
+
+    def get_season_identifier(self):
+        """
+        현재 시즌을 "연도-월" 형식으로 반환합니다.
+        만약 현재 날짜가 26일 이상이면 다음 달의 시즌으로 간주합니다.
+        """
+        tz = pytz.timezone("Asia/Seoul")
+        now = datetime.now(tz)
+        if now.day < 26:
+            return f"{now.year}-{now.month:02d}"
+        else:
+            if now.month == 12:
+                return f"{now.year+1}-01"
+            else:
+                return f"{now.year}-{now.month+1:02d}"
+
+    def check_season_reset(self):
+        """
+        만약 현재 시즌 식별자와 저장된 시즌 식별자가 다르다면(즉, 새 시즌이 시작되었다면),
+        경마 ID를 1로 재설정하고, 현재 경마 및 DB의 경마 결과를 초기화합니다.
+        """
+        new_season = self.get_season_identifier()
+        if self.current_season != new_season:
+            self.race_counter = 1
+            self.current_race = self.init_race()
+            self.db.race_results.delete_many({})
+            self.current_season = new_season
 
     def init_race(self):
         """
@@ -36,13 +68,13 @@ class RaceBetting(commands.Cog):
             {"id": "4", "name": "바람의전사", "odds": 5.0},
             {"id": "5", "name": "불꽃질주", "odds": 6.0},
         ]
-        # race_id는 매번 초기화 시 1로 시작하지만, 필요에 따라 증가하는 로직을 추가할 수 있습니다.
         race = {
-            "race_id": 1,
+            "race_id": self.race_counter,  # 고유 race_id 할당
             "start_time": datetime.now(pytz.timezone("Asia/Seoul")),
             "horses": horses,
             "bets": {}  # 사용자 ID를 key로 한 경기당 한 번의 베팅 내역
         }
+        self.race_counter += 1  # 다음 경기를 위해 race_id 증가
         return race
 
     def is_race_available(self):
@@ -73,6 +105,7 @@ class RaceBetting(commands.Cog):
         단, 시즌 기간 중에만 작동하며, 한 번만 실행되도록 중복을 방지합니다.
         경마 결과는 환경변수 RACE_CHANNEL_ID에 지정된 채널로 전송됩니다.
         """
+        self.check_season_reset()
         tz = pytz.timezone("Asia/Seoul")
         now = datetime.now(tz)
         if not self.is_race_available():
@@ -95,6 +128,7 @@ class RaceBetting(commands.Cog):
         - 베팅이 있는 경우, 각 말의 배당률에 따른 가중치로 우승 말을 결정하고
           베팅 결과를 처리한 후, 결과를 DB의 race_results 컬렉션에 기록하고 채널에 전송합니다.
         """
+        self.check_season_reset()
         race = self.current_race
         tz = pytz.timezone("Asia/Seoul")
         current_time = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
@@ -159,6 +193,7 @@ class RaceBetting(commands.Cog):
         자동 경마 시작 예정 시간(한국시간 기준)을 보여줍니다.
         (경마 베팅은 시즌 기간에만 이용 가능합니다.)
         """
+        self.check_season_reset()
         if not self.is_race_available():
             await ctx.send("경마 베팅은 현재 시즌 기간에만 이용 가능합니다.")
             return
@@ -190,6 +225,7 @@ class RaceBetting(commands.Cog):
         주식 게임의 잔액에서 차감되며, 말 번호 또는 이름 모두 인식됩니다.
         (경마 베팅은 시즌 기간에만 이용 가능합니다.)
         """
+        self.check_season_reset()
         if not self.is_race_available():
             await ctx.send("경마 베팅은 현재 시즌 기간에만 이용 가능합니다.")
             return
@@ -237,6 +273,7 @@ class RaceBetting(commands.Cog):
         현재 경마 경기에서 본인이 베팅한 내역을 확인합니다.
         (경마 베팅은 시즌 기간에만 이용 가능합니다.)
         """
+        self.check_season_reset()
         if not self.is_race_available():
             await ctx.send("경마 베팅은 현재 시즌 기간에만 이용 가능합니다.")
             return
@@ -257,6 +294,7 @@ class RaceBetting(commands.Cog):
         관리자가 수동으로 경기 결과를 결정하여 경마를 진행할 수 있습니다.
         (자동 경마는 매일 오후 6시에 진행됩니다.)
         """
+        self.check_season_reset()
         if not self.is_race_available():
             await ctx.send("경마 베팅은 현재 시즌 기간에만 이용 가능합니다.")
             return
@@ -269,7 +307,9 @@ class RaceBetting(commands.Cog):
         최근 5회의 경마 경기 결과를 보여줍니다.
         만약 명령어를 입력한 사용자가 해당 경기에서 베팅했다면,
         베팅 성공 여부와 획득 금액(또는 베팅금)을 함께 표시합니다.
+        참가하지 않은 경기의 경우 "참가하지 않음"으로 표시합니다.
         """
+        self.check_season_reset()
         results_cursor = self.db.race_results.find({}).sort("timestamp", -1).limit(5)
         results = list(results_cursor)
         if not results:
@@ -294,23 +334,9 @@ class RaceBetting(commands.Cog):
                     bet_amount = bet["bet"]["amount"] if "bet" in bet and "amount" in bet["bet"] else 0
                     line += f" | 당신의 베팅: 실패, 베팅금: {bet_amount:,}원"
             else:
-                line += " | 베팅하지 않음"
+                line += " | 참가하지 않음"
             msg_lines.append(line)
         await ctx.send("\n".join(msg_lines))
-
-    @commands.command(name="내돈")
-    async def my_money(self, ctx):
-        """
-        #내돈:
-        주식 게임에서의 본인 잔액(경마 베팅에도 동일하게 적용됨)을 확인합니다.
-        """
-        user_id = str(ctx.author.id)
-        user = self.db.users.find_one({"_id": user_id})
-        if not user:
-            await ctx.send("주식 게임에 참가하지 않으셨습니다.")
-            return
-        money = user.get("money", 0)
-        await ctx.send(f"{ctx.author.mention}님의 현재 잔액은 {money:,}원입니다.")
 
 async def setup(bot):
     await bot.add_cog(RaceBetting(bot))

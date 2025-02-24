@@ -1413,12 +1413,8 @@ class StockMarket(commands.Cog):
     @commands.command(name="대출")
     async def take_loan(self, ctx, amount: str):
         # 1. 시즌(거래 가능 시간) 체크
-        try:
-            if not self.is_trading_open():
-                await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
-                return
-        except Exception as e:
-            await ctx.send(f"시즌 체크 오류: {e}")
+        if not self.is_trading_open():
+            await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
             return
 
         # 2. 사용자 조회
@@ -1462,25 +1458,59 @@ class StockMarket(commands.Cog):
             await ctx.send(f"대출 한도는 총 {max_loan:,}원입니다. 현재 대출 잔액: {current_loan:,}원. 추가로 {available:,}원만 대출 가능합니다.")
             return
 
-        # 5. 사용자 대출 및 현금 정보 업데이트
-        try:
-            new_loan = current_loan + loan_amount
-            new_money = user.get("money", 0) + loan_amount
-            loan_update = {
-                "amount": new_loan,
-                "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
-        except Exception as e:
-            await ctx.send(f"대출 정보 업데이트 오류: {e}")
-            return
+        # 5. 경고 메시지 및 버튼 뷰 생성
+        view = LoanConfirmationView(self, user, loan_amount)
+        await ctx.send(
+            f"경고: 대출을 진행하면 하루 1% 복리 이자가 적용됩니다.\n"
+            f"대출 금액: {loan_amount:,}원\n"
+            f"현재 이자율: 1% (하루 기준)\n"
+            "진행하시겠습니까?",
+            view=view
+        )
 
-        # 6. 성공 메시지 전송
-        try:
-            await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원의 대출을 받았습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
-        except Exception as e:
-            await ctx.send(f"메시지 전송 오류: {e}")
+    class LoanConfirmationView(discord.ui.View):
+        def __init__(self, cog, user, loan_amount, timeout=30):
+            super().__init__(timeout=timeout)
+            self.cog = cog       # 대출 처리에 필요한 메서드와 DB 접근을 위해 Cog 참조
+            self.user = user     # 현재 사용자 문서
+            self.loan_amount = loan_amount
 
+        @discord.ui.button(label="대출하기", style=discord.ButtonStyle.primary)
+        async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+            try:
+                user_id = self.user["_id"]
+                # 최신 사용자 정보를 DB에서 다시 불러옴
+                user = self.cog.db.users.find_one({"_id": user_id})
+                current_loan = self.cog.update_loan_interest(user)
+                max_loan = 500000
+                if current_loan + self.loan_amount > max_loan:
+                    available = max_loan - current_loan
+                    await interaction.response.send_message(
+                        f"대출 한도 초과: 추가로 {available:,}원만 대출 가능합니다.", 
+                        ephemeral=True
+                    )
+                    return
+                new_loan = current_loan + self.loan_amount
+                new_money = user.get("money", 0) + self.loan_amount
+                loan_update = {
+                    "amount": new_loan,
+                    "last_update": self.cog.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                self.cog.db.users.update_one(
+                    {"_id": user_id},
+                    {"$set": {"money": new_money, "loan": loan_update}}
+                )
+                await interaction.response.send_message(
+                    f"{interaction.user.mention}님, {self.loan_amount:,}원의 대출이 진행되었습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)",
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.response.send_message(f"대출 진행 중 오류 발생: {e}", ephemeral=True)
+
+        @discord.ui.button(label="그만두기", style=discord.ButtonStyle.secondary)
+        async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.response.send_message("대출이 취소되었습니다.", ephemeral=True)
+            self.stop()
 
     @commands.command(name="대출상환")
     async def repay_loan(self, ctx, amount: str):

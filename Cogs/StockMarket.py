@@ -772,12 +772,14 @@ class StockMarket(commands.Cog):
             portfolio = user.get("portfolio", {})
             for sid, holding in portfolio.items():
                 stock = self.db.stocks.find_one({"_id": sid})
-            if stock:
-                total += stock["price"] * holding.get("amount", 0)
-            # 대출금(빚)이 있으면 총 자산에서 차감
-        loan = user.get("loan", {"amount": 0}).get("amount", 0)
-        total -= loan
-        ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
+                if stock:
+                    total += stock["price"] * holding.get("amount", 0)
+            # 대출금(빚)이 있으면 총 자산에서 차감 (대출 정보가 없거나 None이면 0으로 처리)
+            loan_info = user.get("loan")
+            if loan_info and isinstance(loan_info, dict):
+                total -= loan_info.get("amount", 0)
+            ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
+    
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         msg_lines = ["**랭킹 TOP 10**"]
         for idx, (uid, total, uname) in enumerate(ranking_list[:10], start=1):

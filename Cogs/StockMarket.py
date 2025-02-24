@@ -742,7 +742,7 @@ class StockMarket(commands.Cog):
         await ctx.send(msg)
 
     @commands.command(name="랭킹", aliases=["순위"])
-    async def ranking(self, ctx):
+    async def ranking(self, ctx):   
         """
         #랭킹:
         전체 유저의 자산(현금+보유 주식 평가액)을 기준으로 상위 10명을 (유저 id와 게임 내 이름 포함) 출력합니다.
@@ -759,7 +759,7 @@ class StockMarket(commands.Cog):
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         msg_lines = ["**랭킹 TOP 10**"]
         for idx, (uid, total, uname) in enumerate(ranking_list[:10], start=1):
-            msg_lines.append(f"{idx}. {uname} (ID: {uid}) - {total}원")
+            msg_lines.append(f"{idx}. {uname} (ID: {uid}) - {total:,}원")
         await ctx.send("\n".join(msg_lines))
 
     @commands.command(name="시즌")

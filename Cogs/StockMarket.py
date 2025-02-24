@@ -223,6 +223,8 @@ class StockMarket(commands.Cog):
         # MongoDB 연결 (환경변수 MONGODB_URI 사용)
         self.mongo_client = MongoClient(MONGO_URI)
         self.db = self.mongo_client[DB_NAME]
+        self.last_interest_day = None  # 마지막으로 이자가 적용된 날짜 (YYYY-MM-DD)
+        self.bank_interest_loop.start()
 
         # 기존 사용자 문서에 새 필드 추가 (없을 경우에만)
         self.db.users.update_many(
@@ -268,6 +270,7 @@ class StockMarket(commands.Cog):
         self.season_reset_loop.cancel()
         self.trading_resume_loop.cancel()
         self.mongo_client.close()
+        self.bank_interest_loop.cancel()
 
     def get_seoul_time(self):
         return datetime.now(pytz.timezone("Asia/Seoul"))
@@ -398,6 +401,21 @@ class StockMarket(commands.Cog):
         if current_status and not self._last_trading_status:
             self.last_update_min = None
         self._last_trading_status = current_status
+
+    @tasks.loop(minutes=1)
+    async def bank_interest_loop(self):
+        """
+        매 분마다 현재 시간이 0시 0분인 경우 모든 유저의 은행 예금에 0.5% 이자를 추가합니다.
+        하루에 한 번만 적용되도록 last_interest_day를 확인합니다.
+        """
+        now = self.get_seoul_time()
+        current_day = now.date()
+        if now.hour == 0 and now.minute == 0:
+            if self.last_interest_day != current_day:
+                # 모든 유저의 bank 필드에 0.5% 이자 적용 (예금 잔액 * 1.005)
+                result = self.db.users.update_many({}, {"$mul": {"bank": 1.005}})
+                print(f"은행 예금 이자 적용: {result.modified_count}명의 유저에게 0.5% 이자 지급됨.")
+                self.last_interest_day = current_day
 
     async def process_season_end(self, now):
         """

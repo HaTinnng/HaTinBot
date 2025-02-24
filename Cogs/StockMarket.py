@@ -342,14 +342,16 @@ class StockMarket(commands.Cog):
             self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": update_fields})
 
     def update_loan_interest(self, user):
-        # 사용자 문서에 loan 필드가 없거나 값이 없으면 기본값 사용
+        # 사용자 문서에 loan 필드가 없으면 기본값 사용
         loan_info = user.get("loan", {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")})
         last_update_str = loan_info.get("last_update")
         try:
-            last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M:%S")
+            # 파싱 후 서울 타임존을 추가하여 aware datetime 객체로 변환
+            tz = pytz.timezone("Asia/Seoul")
+            last_update = tz.localize(datetime.strptime(last_update_str, "%Y-%m-%d %H:%M:%S"))
         except Exception:
             last_update = self.get_seoul_time()
-        now = self.get_seoul_time()
+        now = self.get_seoul_time()  # 이 값은 이미 aware datetime
         days_passed = (now - last_update).days
         if days_passed > 0 and loan_info.get("amount", 0) > 0:
             new_amount = int(loan_info["amount"] * (1.01 ** days_passed))

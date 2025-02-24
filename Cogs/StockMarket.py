@@ -342,21 +342,21 @@ class StockMarket(commands.Cog):
             self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": update_fields})
 
     def update_loan_interest(self, user):
-        # 대출 정보가 없으면 초기값 설정
-        loan = user.get("loan", {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")})
-        last_update_str = loan.get("last_update")
+        # 사용자 문서에 loan 필드가 없거나 값이 없으면 기본값 사용
+        loan_info = user.get("loan", {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")})
+        last_update_str = loan_info.get("last_update")
         try:
             last_update = datetime.strptime(last_update_str, "%Y-%m-%d %H:%M:%S")
         except Exception:
             last_update = self.get_seoul_time()
         now = self.get_seoul_time()
         days_passed = (now - last_update).days
-        if days_passed > 0 and loan["amount"] > 0:
-            new_amount = loan["amount"] * (1.01 ** days_passed)
-            loan["amount"] = int(new_amount)
-            loan["last_update"] = now.strftime("%Y-%m-%d %H:%M:%S")
-            self.db.users.update_one({"_id": user["_id"]}, {"$set": {"loan": loan}})
-        return loan["amount"]
+        if days_passed > 0 and loan_info.get("amount", 0) > 0:
+            new_amount = int(loan_info["amount"] * (1.01 ** days_passed))
+            loan_info["amount"] = new_amount
+            loan_info["last_update"] = now.strftime("%Y-%m-%d %H:%M:%S")
+            self.db.users.update_one({"_id": user["_id"]}, {"$set": {"loan": loan_info}})
+        return loan_info.get("amount", 0)
 
     @tasks.loop(seconds=10)
     async def stock_update_loop(self):

@@ -228,13 +228,14 @@ class StockMarket(commands.Cog):
 
         # 기존 사용자 문서에 새 필드 추가 (없을 경우에만)
         self.db.users.update_many(
-            {},
-            {"$set": {
-                "bank": 0,
-                "loan": {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")}
-            }}
+            {"bank": {"$exists": False}},
+            {"$set": {"bank": 0}}
         )
-
+        self.db.users.update_many(
+            {"loan": {"$exists": False}},
+            {"$set": {"loan": {"amount": 0, "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")}}}
+        )
+        
         # season 컬렉션 (단일 문서 _id="season") 초기화
         if self.db.season.find_one({"_id": "season"}) is None:
             season_doc = {

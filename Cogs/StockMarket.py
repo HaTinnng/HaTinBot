@@ -217,6 +217,15 @@ def init_stocks():
     return stocks
 
 # ===== Discord Cog: StockMarket =====
+
+class LoanConfirmationView(discord.ui.View):
+    def __init__(self, cog, user, loan_amount, timeout=30):
+        super().__init__(timeout=timeout)
+        self.cog = cog       # 대출 처리용 Cog 참조
+        self.user = user     # 현재 사용자 문서
+        self.loan_amount = loan_amount
+        print("LoanConfirmationView 초기화됨")
+
 class StockMarket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -1473,14 +1482,6 @@ class StockMarket(commands.Cog):
             await ctx.send(f"버튼 뷰 생성 오류: {e}")
             print("버튼 뷰 생성 오류:", e)
             return
-
-    class LoanConfirmationView(discord.ui.View):
-        def __init__(self, cog, user, loan_amount, timeout=30):
-            super().__init__(timeout=timeout)
-            self.cog = cog       # 대출 처리에 필요한 메서드와 DB 접근을 위해 Cog 참조
-            self.user = user     # 현재 사용자 문서
-            self.loan_amount = loan_amount
-            print("LoanConfirmationView 초기화됨")
 
         @discord.ui.button(label="대출하기", style=discord.ButtonStyle.primary)
         async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):

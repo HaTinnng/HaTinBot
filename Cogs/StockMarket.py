@@ -222,6 +222,38 @@ class LoanConfirmationView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.author = author
         self.value = None  # True: 대출 진행, False: 취소
+        self.message = None  # 나중에 전송한 메시지를 저장
+
+    async def on_timeout(self):
+        # 타임아웃 시 모든 버튼을 비활성화하고 메시지 수정
+        if self.value is None:
+            self.value = False
+            for child in self.children:
+                child.disabled = True
+            if self.message:
+                await self.message.edit(content="⏰ 대출 시간이 만료되어 대출이 취소되었습니다.", view=self)
+
+    @discord.ui.button(label="대출하기", style=discord.ButtonStyle.success)
+    async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if interaction.user != self.author:
+            await interaction.response.send_message("이 버튼은 명령어를 입력한 본인만 사용할 수 있습니다.", ephemeral=True)
+            return
+        self.value = True
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    @discord.ui.button(label="그만두기", style=discord.ButtonStyle.danger)
+    async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if interaction.user != self.author:
+            await interaction.response.send_message("이 버튼은 명령어를 입력한 본인만 사용할 수 있습니다.", ephemeral=True)
+            return
+        self.value = False
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
 
     @discord.ui.button(label="대출하기", style=discord.ButtonStyle.success)
     async def confirm(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -1478,7 +1510,10 @@ class StockMarket(commands.Cog):
 
         # 5. 대출 진행 전 경고 메시지와 버튼 띄우기
         view = LoanConfirmationView(author=ctx.author, timeout=30)
-        await ctx.send("⚠️ **대출을 진행하시겠습니까?**\n아래 버튼에서 선택해주세요.", view=view)
+        msg = await ctx.send("⚠️ **대출을 진행하시겠습니까?**\n아래 버튼에서 선택해주세요.", view=view)
+        view.message = msg  # 전송한 메시지를 view에 할당
+
+        # 사용자가 버튼을 누를 때까지 대기
         await view.wait()
     
         if view.value is None:
@@ -1488,7 +1523,9 @@ class StockMarket(commands.Cog):
             await ctx.send("대출이 취소되었습니다.")
             return
 
-        # 6. 사용자 대출 및 현금 정보 업데이트
+        # 대출 진행: 사용자 대출 및 현금 정보 업데이트
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
         new_loan = current_loan + loan_amount
         new_money = user.get("money", 0) + loan_amount
         loan_update = {

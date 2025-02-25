@@ -991,6 +991,9 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="주식지원금", aliases=["지원금"])
     async def stock_support(self, ctx):
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            return
         """
         #주식지원금: 하루에 0시와 12시마다 지원금(30,000원)을 받을 수 있습니다.
         마지막 지원 시각이 현재 기간(0시~11시59분 또는 12시~23시59분)보다 이전이면 지원금을 지급합니다.
@@ -1079,6 +1082,9 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="주식쿠폰입력")
     async def redeem_stock_coupon(self, ctx, coupon_code: str):
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            return
         """
         #주식쿠폰입력 [쿠폰코드]:
         올바른 쿠폰 코드를 입력하면 해당 쿠폰의 지급 금액을 추가 지급합니다.
@@ -1403,6 +1409,9 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="예금")
     async def deposit(self, ctx, amount: str):
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            return
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
         if not user:
@@ -1432,6 +1441,9 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="출금")
     async def withdraw(self, ctx, amount: str):
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            return
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
         if not user:

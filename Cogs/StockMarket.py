@@ -1545,6 +1545,9 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="대출상환", aliases=["상환"])
     async def repay_loan(self, ctx, amount: str):
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            return
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
         if not user:

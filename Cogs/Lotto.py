@@ -15,28 +15,21 @@ DB_NAME = "stock_game"
 ###############################################
 def global_stock_season_check(ctx):
     """
-    주식 명령어는 매월 1일 0시 10분부터 26일 0시 10분까지 사용 가능합니다.
-    복권 관련 명령어(Lotto Cog)는 언제든 사용 가능하도록 예외 처리합니다.
+    모든 명령어는 매월 1일 0시 10분부터 26일 0시 10분까지 사용 가능합니다.
     """
-    # Lotto Cog에 속한 명령어는 언제든 허용
-    if ctx.command and ctx.command.cog and ctx.command.cog.qualified_name == "Lotto":
-        return True
-
     now = datetime.now(pytz.timezone("Asia/Seoul"))
     try:
-        # 현재 달의 1일 0시10분 (새 시즌 시작)
         season_start = now.replace(day=1, hour=0, minute=10, second=0, microsecond=0)
-        # 현재 달의 26일 0시10분 (시즌 종료)
         season_end = now.replace(day=26, hour=0, minute=10, second=0, microsecond=0)
     except ValueError:
-        # (예외 상황 발생 시 기본적으로 허용)
+        # 예외 발생 시 기본적으로 허용
         return True
 
     if season_start <= now < season_end:
         return True
     else:
         raise commands.CheckFailure(
-            "현재는 주식 시즌이 아닙니다. 주식 명령어는 매월 1일 0시 10분부터 26일 0시 10분까지 사용 가능합니다!"
+            "현재는 시즌 기간이 아닙니다. 명령어는 매월 1일 0시 10분부터 26일 0시 10분까지 사용 가능합니다!"
         )
 
 # 메인 봇 파일에서 아래와 같이 전역 체크를 추가하세요.

@@ -885,6 +885,9 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="변동내역")
     async def price_history(self, ctx, stock_name: str):
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            return
         """
         #변동내역 [주식명]:
         해당 주식의 최근 5회 가격 기록을 Windows 11의 Malgun Gothic 폰트를 사용해
@@ -994,7 +997,7 @@ class StockMarket(commands.Cog):
     @commands.command(name="주식지원금", aliases=["지원금"])
     async def stock_support(self, ctx):
         if not self.is_trading_open():
-            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
             return
         """
         #주식지원금: 하루에 0시와 12시마다 지원금(30,000원)을 받을 수 있습니다.
@@ -1085,7 +1088,7 @@ class StockMarket(commands.Cog):
     @commands.command(name="주식쿠폰입력")
     async def redeem_stock_coupon(self, ctx, coupon_code: str):
         if not self.is_trading_open():
-            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
             return
         """
         #주식쿠폰입력 [쿠폰코드]:
@@ -1095,7 +1098,7 @@ class StockMarket(commands.Cog):
         # 여러 쿠폰을 딕셔너리로 관리합니다.
         # 각 쿠폰 코드는 지급 금액과 최대 사용 횟수를 포함합니다.
         valid_coupons = {
-            "2025Season1": {"reward": 300000, "max_usage": 1},
+            "2025Season2": {"reward": 300000, "max_usage": 1},
             # "": {"reward": 200000, "max_usage": 2} 다음 원하는 거 추가
         }
 
@@ -1412,7 +1415,7 @@ class StockMarket(commands.Cog):
     @commands.command(name="예금")
     async def deposit(self, ctx, amount: str):
         if not self.is_trading_open():
-            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
             return
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
@@ -1444,7 +1447,7 @@ class StockMarket(commands.Cog):
     @commands.command(name="출금")
     async def withdraw(self, ctx, amount: str):
         if not self.is_trading_open():
-            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
             return
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
@@ -1548,7 +1551,7 @@ class StockMarket(commands.Cog):
     @commands.command(name="대출상환", aliases=["상환"])
     async def repay_loan(self, ctx, amount: str):
         if not self.is_trading_open():
-            await ctx.send("현재 시즌 종료 중입니다. 지원금 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
             return
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})

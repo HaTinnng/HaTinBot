@@ -465,9 +465,11 @@ class StockMarket(commands.Cog):
                 })
         self.db.season_results.insert_one(season_result_doc)
 
-        # 칭호 부여 (TOP3)
+        # 칭호 부여 (TOP3) - 메달 이모지 추가
+        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
         for idx, (user_id, _) in enumerate(ranking[:3], start=1):
-            title = f"{season['year']} 시즌{season['season_no']} TOP{idx}"
+            medal = medals.get(idx, "")
+            title = f"{medal} {season['year']} 시즌{season['season_no']} TOP{idx}"
             user = self.db.users.find_one({"_id": user_id})
             if user:
                 titles = user.get("titles", [])

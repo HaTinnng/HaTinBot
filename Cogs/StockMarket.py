@@ -26,22 +26,22 @@ def init_stocks():
     17개의 주식을 아래와 같이 초기화합니다.
       - "311유통": 1500
       - "썬더타이어": 3500 ~ 5000
-      - "룡치수산": 9000 ~ 12000
-      - "맥턴맥주": 21000 ~ 30000
-      - "섹보경아트": 45000 ~ 50000
-      - "전차자동차": 70000 ~ 80000
-      - "이리여행사": 100000
-      - "디코커피": 125000 ~ 145000
-      - "와이제이엔터": 185000 ~ 200000
-      - "파피게임사": 250000 ~ 300000
-      - "하틴봇전자": 380000 ~ 400000
-      - "하틴출판사": 525000 ~ 550000
-      - "창훈버거": 675000 ~ 700000
-      - "끼룩제약": 875000
-      - "날틀식품": 1500000
+      - "룡치수산": 17000 ~ 19500
+      - "맥턴맥주": 32000 ~ 40000
+      - "섹보경아트": 64000 ~ 70000
+      - "전차자동차": 100000
+      - "이리여행사": 155000
+      - "디코커피": 280000 ~ 290000
+      - "와이제이엔터": 460000 ~ 500000
+      - "파피게임사": 650000 ~ 680000
+      - "하틴봇전자": 790000 ~ 820000
+      - "하틴출판사": 1225000 ~ 1300000
+      - "창훈버거": 1755555
+      - "끼룩제약": 2250000 ~ 2400000
+      - "날틀식품": 3000000
       - "백만통신": 1000000
       - "베스트보험": 10000
-      - "후니마트": 2000000
+      - "후니마트": 4500000
 
     각 종목은 추가적으로 아래 필드를 가집니다.
       - last_change, percent_change: 최근 가격 변동 내역
@@ -70,7 +70,7 @@ def init_stocks():
     stocks["3"] = {
         "_id": "3",
         "name": "룡치수산",
-        "price": random.randint(9000, 12000),
+        "price": random.randint(17000, 19500),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -79,7 +79,7 @@ def init_stocks():
     stocks["4"] = {
         "_id": "4",
         "name": "맥턴맥주",
-        "price": random.randint(21000, 30000),
+        "price": random.randint(32000, 40000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -88,7 +88,7 @@ def init_stocks():
     stocks["5"] = {
         "_id": "5",
         "name": "섹보경아트",
-        "price": random.randint(45000, 50000),
+        "price": random.randint(64000, 70000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -97,7 +97,7 @@ def init_stocks():
     stocks["6"] = {
         "_id": "6",
         "name": "전차자동차",
-        "price": random.randint(70000, 80000),
+        "price": random.randint(100000, 100001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -106,7 +106,7 @@ def init_stocks():
     stocks["7"] = {
         "_id": "7",
         "name": "이리여행사",
-        "price": random.randint(100000, 100001),
+        "price": random.randint(155000, 155001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -115,7 +115,7 @@ def init_stocks():
     stocks["8"] = {
         "_id": "8",
         "name": "디코커피",
-        "price": random.randint(125000, 145000),
+        "price": random.randint(280000, 290000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -124,7 +124,7 @@ def init_stocks():
     stocks["9"] = {
         "_id": "9",
         "name": "와이제이엔터",
-        "price": random.randint(185000, 200000),
+        "price": random.randint(460000, 500000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -133,7 +133,7 @@ def init_stocks():
     stocks["10"] = {
         "_id": "10",
         "name": "파피게임사",
-        "price": random.randint(250000, 300000),
+        "price": random.randint(650000, 680000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -142,7 +142,7 @@ def init_stocks():
     stocks["11"] = {
         "_id": "11",
         "name": "하틴봇전자",
-        "price": random.randint(380000, 400000),
+        "price": random.randint(790000, 820000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -151,7 +151,7 @@ def init_stocks():
     stocks["12"] = {
         "_id": "12",
         "name": "하틴출판사",
-        "price": random.randint(525000, 550000),
+        "price": random.randint(1255000, 1300000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -160,7 +160,7 @@ def init_stocks():
     stocks["13"] = {
         "_id": "13",
         "name": "창훈버거",
-        "price": random.randint(675000, 700000),
+        "price": random.randint(1755555, 1755556),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -169,7 +169,7 @@ def init_stocks():
     stocks["14"] = {
         "_id": "14",
         "name": "끼룩제약",
-        "price": random.randint(827500, 827501),
+        "price": random.randint(2250000, 2300000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -178,7 +178,7 @@ def init_stocks():
     stocks["15"] = {
         "_id": "15",
         "name": "날틀식품",
-        "price": random.randint(1500000, 1500001),
+        "price": random.randint(3000000, 3000001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -205,7 +205,7 @@ def init_stocks():
     stocks["18"] = {
         "_id": "18",
         "name": "후니마트",
-        "price": random.randint(2000000, 2000001),
+        "price": random.randint(4500000, 4500001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,

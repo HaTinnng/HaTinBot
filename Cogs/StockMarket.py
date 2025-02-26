@@ -27,7 +27,7 @@ def init_stocks():
       - "311유통": 1500
       - "썬더타이어": 3500 ~ 5000
       - "룡치수산": 9000 ~ 12000
-      - "맥턴맥주": 18000 ~ 30000
+      - "맥턴맥주": 21000 ~ 30000
       - "섹보경아트": 45000 ~ 50000
       - "전차자동차": 70000 ~ 80000
       - "이리여행사": 100000
@@ -37,11 +37,11 @@ def init_stocks():
       - "하틴봇전자": 380000 ~ 400000
       - "하틴출판사": 525000 ~ 550000
       - "창훈버거": 675000 ~ 700000
-      - "끼룩제약": 827500
-      - "날틀식품": 950000
+      - "끼룩제약": 875000
+      - "날틀식품": 1500000
       - "백만통신": 1000000
       - "베스트보험": 10000
-      - "후니마트": 1500000
+      - "후니마트": 2000000
 
     각 종목은 추가적으로 아래 필드를 가집니다.
       - last_change, percent_change: 최근 가격 변동 내역
@@ -79,7 +79,7 @@ def init_stocks():
     stocks["4"] = {
         "_id": "4",
         "name": "맥턴맥주",
-        "price": random.randint(18000, 30000),
+        "price": random.randint(21000, 30000),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -178,7 +178,7 @@ def init_stocks():
     stocks["15"] = {
         "_id": "15",
         "name": "날틀식품",
-        "price": random.randint(950000, 950001),
+        "price": random.randint(1500000, 1500001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,
@@ -205,7 +205,7 @@ def init_stocks():
     stocks["18"] = {
         "_id": "18",
         "name": "후니마트",
-        "price": random.randint(1500000, 1500001),
+        "price": random.randint(2000000, 2000001),
         "last_change": 0,
         "percent_change": 0,
         "listed": True,

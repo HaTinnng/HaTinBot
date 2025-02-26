@@ -1587,5 +1587,39 @@ class StockMarket(commands.Cog):
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
         await ctx.send(f"{ctx.author.mention}님, {repay_amount:,}원을 대출 상환하였습니다. (남은 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
 
+    @commands.command(name="다음시즌")
+    async def next_season(self, ctx):
+        """
+        #다음시즌:
+        현재 진행 중인 시즌이 아닌, 다음에 진행될 시즌에 대한 정보를 출력합니다.
+        (시즌 기간은 매월 1일 0시 10분부터 26일 0시 10분까지로 설정)
+        """
+        now = self.get_seoul_time()
+        tz = pytz.timezone("Asia/Seoul")
+        
+        # 다음 시즌은 항상 현재 달의 시즌이 끝난 후, 즉 다음 달 1일 0시 10분에 시작합니다.
+        if now.month == 12:
+            next_year = now.year + 1
+            next_month = 1
+        else:
+            next_year = now.year
+            next_month = now.month + 1
+        
+        next_season_start = tz.localize(datetime(next_year, next_month, 1, 0, 10, 0))
+        next_season_end = tz.localize(datetime(next_year, next_month, 26, 0, 10, 0))
+        
+        # 남은 시간을 계산합니다.
+        remaining = next_season_start - now
+        days = remaining.days
+        hours, rem = divmod(remaining.seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
+        remaining_str = f"{days}일 {hours}시간 {minutes}분 {seconds}초"
+        
+        await ctx.send(
+            f"**다음 시즌 정보**\n"
+            f"시즌 기간: {next_season_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {next_season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"시작까지 남은 시간: {remaining_str}"
+        )
+
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

@@ -6,7 +6,7 @@ from datetime import datetime
 import pytz
 from pymongo import MongoClient
 
-# 데이터베이스 설정 (기존 코드와 동일)
+# 데이터베이스 설정
 DB_NAME = "stock_game"
 MONGO_URI = os.environ.get("MONGODB_URI")
 
@@ -42,48 +42,49 @@ class StockNews(commands.Cog):
         """
         DB의 상장된 주식 종목 중 무작위로 몇 종목을 선택하여,
         100개의 다양한 뉴스 템플릿 중 하나를 적용해 헤드라인과 상세 설명을 생성합니다.
-        템플릿에는 "예상됩니다" 외에도 "보입니다", "추정됩니다", "가능성이 있습니다" 등 다양한 표현이 사용됩니다.
+        템플릿에는 "예상됩니다", "보입니다", "추정됩니다", "가능성이 있습니다" 등 다양한 미래 예측 표현이 사용됩니다.
+        생성된 뉴스는 MongoDB의 "news" 컬렉션에 저장됩니다.
         """
         stocks = list(self.db.stocks.find({"listed": True}))
         if not stocks:
             self.current_news = [{"headline": "현재 뉴스가 없습니다.", "details": ""}]
             return
 
-        # 총 100개의 뉴스 템플릿 (그룹별로 나누어 정의)
+        # 총 100개의 뉴스 템플릿 (4개 그룹으로 구성)
         news_templates = [
-            # Group 1: 기존 25개 템플릿 (다양한 미래 예측 표현 적용)
-            {"type": "positive", "headline": "{stock}의 주가가 상승할 것으로 보입니다.", "details": "최근 투자자들의 긍정적인 분위기와 거래량 증가로 인해, {stock}의 주가가 상승할 것으로 추정됩니다."},
+            # Group 1: 25 템플릿
+            {"type": "positive", "headline": "{stock}의 주가가 상승할 것으로 보입니다.", "details": "최근 투자자들의 긍정적 분위기와 거래량 증가로 인해, {stock}의 주가가 상승할 것으로 추정됩니다."},
             {"type": "negative", "headline": "{stock}의 주가가 급락할 것으로 추정됩니다.", "details": "최근 부정적인 이슈와 시장 불안으로 인해, {stock}의 주가가 급락할 가능성이 있습니다."},
             {"type": "neutral", "headline": "{stock} 관련 시장 동향에 변화가 감지됩니다.", "details": "시장 반응이 다양하게 나타나고 있어, {stock}의 주가에 대해 신중한 판단이 요구됩니다."},
-            {"type": "in-depth_positive", "headline": "{stock}의 최신 분기 실적이 호조를 보일 것으로 예상됩니다.", "details": "{stock}의 최신 분기 실적이 예상치를 상회할 것으로 기대되며, 투자자들의 기대가 모아지고 있습니다."},
+            {"type": "in-depth_positive", "headline": "{stock}의 최신 분기 실적이 호조를 보일 것으로 예상됩니다.", "details": "{stock}의 실적이 예상치를 상회할 것으로 기대되며, 투자자들의 관심이 모아지고 있습니다."},
             {"type": "in-depth_negative", "headline": "{stock}의 경영진이 실적 부진에 대해 해명할 것으로 추정됩니다.", "details": "최근 {stock}의 실적 부진과 관련하여 경영진이 해명을 발표할 가능성이 있습니다."},
             {"type": "analysis", "headline": "전문가들은 {stock}의 단기 주가 변동이 불안정할 것으로 예측합니다.", "details": "시장 분석 결과, {stock}의 주가가 단기적으로 불안정하게 움직일 수 있음을 시사합니다."},
-            {"type": "sentiment_negative", "headline": "투자 심리가 {stock}에 부정적인 영향을 미칠 것으로 보입니다.", "details": "투자 심리 위축과 불안감으로 인해, {stock}의 주가 하락 우려가 있습니다."},
+            {"type": "sentiment_negative", "headline": "투자 심리가 {stock}에 부정적으로 작용할 것으로 보입니다.", "details": "투자 심리 위축과 불안감으로 인해, {stock}의 주가 하락 우려가 제기되고 있습니다."},
             {"type": "sentiment_positive", "headline": "{stock}의 주가가 거래량 증가와 함께 상승할 것으로 추정됩니다.", "details": "거래량 증가가 긍정적인 신호로 작용하여, {stock}의 주가 상승 기대감이 있습니다."},
-            {"type": "interest", "headline": "{stock}에 대한 투자자들의 관심이 확대될 것으로 보입니다.", "details": "시장 조사에 따르면, {stock}에 대한 관심이 높아지면서 주가에 긍정적인 영향을 줄 가능성이 있습니다."},
+            {"type": "interest", "headline": "{stock}에 대한 투자자들의 관심이 확대될 것으로 보입니다.", "details": "시장 조사에 따르면, {stock}에 대한 관심이 높아지면서 주가에 긍정적인 영향을 줄 수 있습니다."},
             {"type": "product", "headline": "{stock}의 신제품 발표가 주가에 긍정적으로 작용할 것으로 보입니다.", "details": "다가오는 신제품 발표 소식에 힘입어, {stock}의 주가 상승 가능성이 있습니다."},
             {"type": "global", "headline": "{stock}의 글로벌 시장 진출이 주가를 견인할 것으로 보입니다.", "details": "글로벌 확장 전략이 {stock}의 주가에 긍정적인 영향을 미칠 것으로 기대됩니다."},
             {"type": "volatility", "headline": "최근 분석 결과, {stock}의 주가 변동성이 증가할 것으로 추정됩니다.", "details": "시장 전문가들은 {stock}의 주가가 단기적으로 큰 변동성을 보일 수 있음을 시사합니다."},
             {"type": "earnings", "headline": "{stock}의 실적 발표 후 주가에 변동이 있을 것으로 보입니다.", "details": "곧 발표될 {stock}의 실적에 따라 주가가 움직일 가능성이 있습니다."},
             {"type": "trade", "headline": "{stock}의 주가가 거래 호조에 힘입어 상승할 것으로 보입니다.", "details": "긍정적인 투자 분위기가 {stock}의 주가 상승에 기여할 것으로 기대됩니다."},
-            {"type": "uncertainty", "headline": "시장 불안정 속에서 {stock}의 주가 하락 가능성이 제기됩니다.", "details": "불안정한 경제 상황과 내부 이슈로 인해, {stock}의 주가 하락 우려가 있습니다."},
+            {"type": "uncertainty", "headline": "시장 불안정 속에서 {stock}의 주가 하락 우려가 있습니다.", "details": "불안정한 경제 상황과 내부 이슈로 인해, {stock}의 주가 하락 가능성이 제기됩니다."},
             {"type": "innovation", "headline": "{stock}의 기술 혁신 소식이 주가에 긍정적으로 작용할 것으로 보입니다.", "details": "최근 기술 혁신 소식이 {stock}의 경쟁력을 강화하여 주가 상승에 기여할 것으로 기대됩니다."},
-            {"type": "competition", "headline": "{stock}의 경쟁사 대비 분석 결과, 주가 조정이 있을 수 있습니다.", "details": "경쟁사 대비 {stock}의 위치에 따라 주가 조정 가능성이 있습니다."},
+            {"type": "competition", "headline": "{stock}의 경쟁사 대비 분석 결과, 주가 조정 가능성이 있습니다.", "details": "경쟁사와의 비교에서 {stock}의 위치에 따라 주가 조정 가능성이 있습니다."},
             {"type": "strategy", "headline": "{stock}의 경영 전략 변화가 주가에 영향을 줄 수 있습니다.", "details": "최근 전략 변화가 {stock}의 주가에 영향을 미칠 가능성이 있으며, 시장의 반응이 주목됩니다."},
-            {"type": "psychology", "headline": "투자자 심리 변화로 {stock}의 주가가 조정될 수 있습니다.", "details": "심리 변화에 따라 {stock}의 주가가 일시적으로 조정될 가능성이 있습니다."},
+            {"type": "psychology", "headline": "투자자 심리 변화로 {stock}의 주가 조정 가능성이 있습니다.", "details": "심리 변화에 따라 {stock}의 주가가 일시적으로 조정될 가능성이 있습니다."},
             {"type": "investment", "headline": "{stock}의 신규 투자 소식이 주가 상승을 견인할 수 있습니다.", "details": "대규모 신규 투자가 {stock}의 주가에 긍정적인 영향을 미칠 가능성이 있습니다."},
-            {"type": "stability", "headline": "{stock}의 주가가 안정적인 흐름을 유지할 수 있습니다.", "details": "견고한 재무 구조가 {stock}의 주가 안정에 기여할 것으로 보입니다."},
-            {"type": "issue", "headline": "최근 이슈로 {stock}의 주가가 일시적으로 하락할 수 있습니다.", "details": "특정 이슈가 {stock}의 주가에 단기적인 영향을 미칠 가능성이 있습니다."},
+            {"type": "stability", "headline": "{stock}의 주가가 안정적인 흐름을 유지할 가능성이 있습니다.", "details": "견고한 재무 구조가 {stock}의 주가 안정에 기여할 것으로 보입니다."},
+            {"type": "issue", "headline": "최근 이슈로 인해 {stock}의 주가가 일시적으로 하락할 수 있습니다.", "details": "특정 이슈가 {stock}의 주가에 단기적인 영향을 미칠 가능성이 있습니다."},
             {"type": "overseas", "headline": "{stock}의 해외 진출 소식이 주가에 긍정적으로 작용할 수 있습니다.", "details": "해외 진출이 {stock}의 주가 상승에 기여할 가능성이 있습니다."},
             {"type": "internal", "headline": "{stock}의 내부 이슈 해결 기대감이 주가에 긍정적으로 작용할 수 있습니다.", "details": "내부 이슈 해결이 {stock}의 주가에 긍정적인 영향을 줄 수 있습니다."},
             {"type": "adjustment", "headline": "전문가들은 {stock}의 주가가 단기 조정 국면에 들어갈 수 있다고 봅니다.", "details": "단기 조정 가능성이 있으나, 장기 성장 전망은 긍정적으로 평가됩니다."},
-
+            
             # Group 2: 20 템플릿
-            {"type": "merger", "headline": "{stock}의 합병 소식이 시장에 큰 반향을 불러일으킬 수 있습니다.", "details": "최근 {stock}과 관련된 합병 소식이 투자자들의 관심을 모으며, 주가에 긍정적인 영향을 미칠 가능성이 있습니다."},
+            {"type": "merger", "headline": "{stock}의 합병 소식이 시장에 큰 반향을 불러일으킬 수 있습니다.", "details": "최근 {stock} 관련 합병 소식이 투자자들의 관심을 모으며, 주가에 긍정적인 영향을 미칠 가능성이 있습니다."},
             {"type": "dividend", "headline": "{stock}의 배당 정책 변화가 주가에 영향을 줄 수 있습니다.", "details": "최근 발표된 배당 정책 변화가 {stock}의 주가에 긍정적인 신호를 줄 수 있습니다."},
             {"type": "regulation", "headline": "정부 규제 변화가 {stock}의 주가에 변동을 가져올 수 있습니다.", "details": "최근 정부 규제 변화가 {stock}의 주가에 영향을 미칠 가능성이 있으며, 주가 변동이 예상됩니다."},
             {"type": "scandal", "headline": "{stock} 관련 내부 스캔들이 주가에 부정적인 영향을 줄 수 있습니다.", "details": "내부 스캔들 소식이 {stock}의 주가 하락 우려를 불러일으킬 수 있습니다."},
-            {"type": "innovation_tech", "headline": "{stock}의 AI 도입 소식이 주가에 긍정적인 영향을 미칠 수 있습니다.", "details": "AI 기술 도입이 {stock}의 혁신을 이끌어내어 주가 상승 요인으로 작용할 수 있습니다."},
+            {"type": "innovation_tech", "headline": "{stock}의 AI 도입 소식이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "AI 기술 도입이 {stock}의 혁신을 이끌어내어 주가 상승 요인으로 작용할 수 있습니다."},
             {"type": "market_expansion", "headline": "{stock}의 해외 지사 확장이 주가 상승에 기여할 수 있습니다.", "details": "해외 지사 확장 계획이 {stock}의 글로벌 경쟁력을 강화하여 주가에 긍정적인 영향을 줄 수 있습니다."},
             {"type": "financial_results", "headline": "{stock}의 재무 지표 개선 소식이 주가에 긍정적으로 작용할 수 있습니다.", "details": "최근 {stock}의 재무 지표 개선이 투자자 신뢰를 높여 주가 상승에 기여할 수 있습니다."},
             {"type": "supply_chain", "headline": "{stock}의 공급망 안정화 소식이 주가 상승에 기여할 수 있습니다.", "details": "공급망 문제 해결이 {stock}의 생산 효율성을 높여 주가에 긍정적인 영향을 줄 수 있습니다."},
@@ -99,7 +100,7 @@ class StockNews(commands.Cog):
             {"type": "stock_split", "headline": "{stock}의 주식 분할 계획이 투자자들에게 긍정적으로 작용할 수 있습니다.", "details": "주식 분할 계획 발표가 {stock}의 접근성을 높여 주가 상승 요인으로 작용할 수 있습니다."},
             {"type": "insider_trading", "headline": "{stock} 내부자의 거래 소식이 주가에 단기적인 영향을 줄 수 있습니다.", "details": "최근 {stock} 내부자 거래 소식이 단기 주가 변동을 야기할 수 있으나, 장기 영향은 미미할 수 있습니다."},
             {"type": "seasonal", "headline": "계절적 요인에 따라 {stock}의 주가가 조정될 수 있습니다.", "details": "계절적 수요 변화가 {stock}의 주가에 일시적인 조정을 가져올 수 있습니다."},
-
+            
             # Group 3: 30 템플릿
             {"type": "tech", "headline": "{stock}의 AI 도입 소식이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "최근 AI 기술 도입이 {stock}의 혁신을 이끌어내어 주가 상승 요인으로 작용할 가능성이 있습니다."},
             {"type": "sustainability", "headline": "{stock}의 친환경 경영 전략이 주가에 긍정적인 효과를 줄 수 있습니다.", "details": "환경 친화적 정책이 {stock}의 브랜드 이미지를 강화하여 주가에 긍정적인 영향을 미칠 수 있습니다."},
@@ -177,23 +178,34 @@ class StockNews(commands.Cog):
         
         self.current_news = news_list
 
+        # 뉴스 데이터를 DB에 저장 (컬렉션 이름: "news")
+        now = datetime.now(pytz.timezone("Asia/Seoul"))
+        news_doc = {
+            "timestamp": now,
+            "news": news_list
+        }
+        self.db.news.insert_one(news_doc)
+
     @commands.command(name="뉴스")
     async def news_command(self, ctx):
         """
         #뉴스: 최신 뉴스 항목들을 Embed 형태로 출력합니다.
         각 뉴스는 헤드라인과 상세 설명을 포함하여 꾸며진 Embed에 추가됩니다.
         """
-        if not self.current_news:
+        # DB에서 가장 최신 뉴스 문서를 조회합니다.
+        latest_news = self.db.news.find_one(sort=[("timestamp", -1)])
+        if not latest_news or not latest_news.get("news"):
             await ctx.send("현재 뉴스가 없습니다. 잠시 후 다시 시도해주세요.")
         else:
+            news_list = latest_news["news"]
             now = datetime.now(pytz.timezone("Asia/Seoul"))
             embed = discord.Embed(
                 title="📰 최신 뉴스",
-                description="아래는 최신으로 생성된 뉴스 항목입니다.",
+                description="아래는 최신으로 저장된 뉴스 항목입니다.",
                 color=discord.Color.gold(),
                 timestamp=now
             )
-            for i, news in enumerate(self.current_news, start=1):
+            for i, news in enumerate(news_list, start=1):
                 embed.add_field(
                     name=f"뉴스 {i}: {news['headline']}",
                     value=news['details'],

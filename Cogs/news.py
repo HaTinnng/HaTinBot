@@ -50,7 +50,6 @@ class StockNews(commands.Cog):
 
         # 총 100개의 뉴스 템플릿 (4개 그룹으로 구성)
         news_templates = [
-            # Group 1: 25 템플릿
             {"type": "positive", "headline": "{stock}의 주가가 상승할 것으로 보입니다.", "details": "최근 투자자들의 긍정적 분위기와 거래량 증가로 인해, {stock}의 주가가 상승할 것으로 추정됩니다."},
             {"type": "negative", "headline": "{stock}의 주가가 급락할 것으로 추정됩니다.", "details": "최근 부정적인 이슈와 시장 불안으로 인해, {stock}의 주가가 급락할 가능성이 있습니다."},
             {"type": "neutral", "headline": "{stock} 관련 시장 동향에 변화가 감지됩니다.", "details": "시장 반응이 다양하게 나타나고 있어, {stock}의 주가에 대해 신중한 판단이 요구됩니다."},
@@ -76,8 +75,6 @@ class StockNews(commands.Cog):
             {"type": "overseas", "headline": "{stock}의 해외 진출 소식이 주가에 긍정적으로 작용할 수 있습니다.", "details": "해외 진출이 {stock}의 주가 상승에 기여할 가능성이 있습니다."},
             {"type": "internal", "headline": "{stock}의 내부 이슈 해결 기대감이 주가에 긍정적으로 작용할 수 있습니다.", "details": "내부 이슈 해결이 {stock}의 주가에 긍정적인 영향을 줄 수 있습니다."},
             {"type": "adjustment", "headline": "전문가들은 {stock}의 주가가 단기 조정 국면에 들어갈 수 있다고 봅니다.", "details": "단기 조정 가능성이 있으나, 장기 성장 전망은 긍정적으로 평가됩니다."},
-            
-            # Group 2: 20 템플릿
             {"type": "merger", "headline": "{stock}의 합병 소식이 시장에 큰 반향을 불러일으킬 수 있습니다.", "details": "최근 {stock} 관련 합병 소식이 투자자들의 관심을 모으며, 주가에 긍정적인 영향을 미칠 가능성이 있습니다."},
             {"type": "dividend", "headline": "{stock}의 배당 정책 변화가 주가에 영향을 줄 수 있습니다.", "details": "최근 발표된 배당 정책 변화가 {stock}의 주가에 긍정적인 신호를 줄 수 있습니다."},
             {"type": "regulation", "headline": "정부 규제 변화가 {stock}의 주가에 변동을 가져올 수 있습니다.", "details": "최근 정부 규제 변화가 {stock}의 주가에 영향을 미칠 가능성이 있으며, 주가 변동이 예상됩니다."},
@@ -98,8 +95,6 @@ class StockNews(commands.Cog):
             {"type": "stock_split", "headline": "{stock}의 주식 분할 계획이 투자자들에게 긍정적으로 작용할 수 있습니다.", "details": "주식 분할 계획 발표가 {stock}의 접근성을 높여 주가 상승 요인으로 작용할 수 있습니다."},
             {"type": "insider_trading", "headline": "{stock} 내부자의 거래 소식이 주가에 단기적인 영향을 줄 수 있습니다.", "details": "최근 {stock} 내부자 거래 소식이 단기 주가 변동을 야기할 수 있으나, 장기 영향은 미미할 수 있습니다."},
             {"type": "seasonal", "headline": "계절적 요인에 따라 {stock}의 주가가 조정될 수 있습니다.", "details": "계절적 수요 변화가 {stock}의 주가에 일시적인 조정을 가져올 수 있습니다."},
-            
-            # Group 3: 30 템플릿
             {"type": "tech", "headline": "{stock}의 AI 도입 소식이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "최근 AI 기술 도입이 {stock}의 혁신을 이끌어내어 주가 상승 요인으로 작용할 가능성이 있습니다."},
             {"type": "sustainability", "headline": "{stock}의 친환경 경영 전략이 주가에 긍정적인 효과를 줄 수 있습니다.", "details": "환경 친화적 정책이 {stock}의 브랜드 이미지를 강화하여 주가에 긍정적인 영향을 미칠 수 있습니다."},
             {"type": "expansion", "headline": "{stock}의 해외 지사 확장이 주가 상승을 견인할 수 있습니다.", "details": "해외 지사 확장 계획이 {stock}의 글로벌 경쟁력을 강화하여 주가 상승에 기여할 수 있습니다."},
@@ -130,8 +125,6 @@ class StockNews(commands.Cog):
             {"type": "innovative_product", "headline": "{stock}의 혁신적인 신제품 출시가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "혁신적인 신제품 출시에 힘입어 {stock}의 주가가 상승할 가능성이 있습니다."},
             {"type": "sustainability_initiative", "headline": "{stock}의 지속 가능한 경영 이니셔티브가 주가에 긍정적으로 작용할 수 있습니다.", "details": "지속 가능한 경영 전략이 {stock}의 이미지 개선에 기여하여 주가 상승에 긍정적인 영향을 줄 수 있습니다."},
             {"type": "customer_growth", "headline": "{stock}의 고객 기반 확대가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "고객 기반 확대로 인해 {stock}의 매출 및 주가가 상승할 가능성이 있습니다."},
-
-            # Group 4: 25 템플릿
             {"type": "market_overview", "headline": "최근 시장 동향이 {stock}의 주가에 긍정적인 영향을 미칠 수 있습니다.", "details": "시장 전반의 흐름이 {stock}의 주가 상승에 기여할 가능성이 있습니다."},
             {"type": "investment_forecast", "headline": "분석가들은 {stock}의 주가가 상승할 것으로 전망합니다.", "details": "최근 분석 결과에 따르면, {stock}의 주가 상승 가능성이 크다고 예측됩니다."},
             {"type": "economic_growth", "headline": "긍정적인 경제 성장 전망이 {stock}의 주가에 반영될 수 있습니다.", "details": "경제 성장세가 {stock}의 사업 환경 개선에 기여하여 주가 상승에 영향을 줄 수 있습니다."},
@@ -157,6 +150,56 @@ class StockNews(commands.Cog):
             {"type": "tech_leadership", "headline": "{stock}의 기술 리더십이 주가 상승을 견인할 수 있습니다.", "details": "강력한 기술 리더십이 {stock}의 경쟁력 강화에 기여하여 주가 상승에 긍정적으로 작용할 수 있습니다."},
             {"type": "innovation_pipeline", "headline": "{stock}의 혁신적인 제품 파이프라인이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "혁신적인 제품 개발 계획이 {stock}의 장기 성장에 기여하여 주가 상승을 이끌 수 있습니다."},
             {"type": "sector_growth", "headline": "해당 산업 섹터의 성장 전망이 {stock}의 주가에 긍정적으로 반영될 수 있습니다.", "details": "산업 섹터 내 성장 전망이 {stock}의 주가 상승에 기여할 가능성이 있습니다."}
+            {"type": "eco_trend", "headline": "{stock}의 친환경 트렌드가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "최근 친환경 정책과 소비자 선호도가 {stock}의 사업에 긍정적인 영향을 미쳐 주가 상승 가능성이 있습니다."},
+            {"type": "tech_investment", "headline": "{stock}의 기술 투자 확대가 주가 상승 모멘텀을 강화할 수 있습니다.", "details": "첨단 기술 투자로 인해 {stock}의 경쟁력이 강화되어 주가에 긍정적인 영향을 미칠 가능성이 있습니다."},
+            {"type": "supply_chain_optimization", "headline": "{stock}의 공급망 최적화가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "효율적인 공급망 관리가 {stock}의 생산성을 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "market_expansion_strategy", "headline": "{stock}의 시장 확장 전략이 주가에 긍정적으로 작용할 수 있습니다.", "details": "새로운 시장 개척이 {stock}의 매출 증대로 이어져 주가 상승에 기여할 가능성이 있습니다."},
+            {"type": "product_innovation", "headline": "{stock}의 제품 혁신이 주가 상승을 견인할 수 있습니다.", "details": "혁신적인 제품 개발이 {stock}의 경쟁력을 강화하여 주가 상승에 긍정적인 영향을 미칠 수 있습니다."},
+            {"type": "customer_experience", "headline": "{stock}의 고객 경험 개선이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "고객 만족도 향상이 {stock}의 브랜드 가치 상승에 기여하여 주가 상승 모멘텀을 강화할 수 있습니다."},
+            {"type": "digital_marketing", "headline": "{stock}의 디지털 마케팅 강화가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "디지털 채널을 통한 마케팅 전략이 {stock}의 인지도와 매출 증대로 이어져 주가 상승에 기여할 수 있습니다."},
+            {"type": "innovation_collaboration", "headline": "{stock}의 혁신 협업 소식이 주가에 긍정적인 모멘텀을 제공할 수 있습니다.", "details": "다양한 기업과의 협업이 {stock}의 기술력과 시장 경쟁력을 강화하여 주가 상승에 기여할 수 있습니다."},
+            {"type": "brand_recognition", "headline": "{stock}의 브랜드 인지도 상승이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "높은 브랜드 인지도가 {stock}의 시장 점유율 확대와 주가 상승에 기여할 수 있습니다."},
+            {"type": "financial_innovation", "headline": "{stock}의 금융 혁신 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "새로운 금융 상품 및 서비스 도입이 {stock}의 수익성을 개선하여 주가 상승에 기여할 가능성이 있습니다."},
+            {"type": "operational_cost_reduction", "headline": "{stock}의 운영 비용 절감이 주가에 긍정적인 영향을 미칠 수 있습니다.", "details": "효율적인 비용 관리 전략이 {stock}의 이익 개선에 기여하여 주가 상승에 긍정적인 효과를 줄 수 있습니다."},
+            {"type": "expansion_into_new_segments", "headline": "{stock}의 신시장 진출이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "새로운 고객층 확보와 시장 다각화가 {stock}의 매출 증대로 이어져 주가 상승에 기여할 가능성이 있습니다."},
+            {"type": "sustainability_investment", "headline": "{stock}의 지속 가능한 투자 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "지속 가능한 경영과 투자 전략이 {stock}의 장기 성장에 기여할 가능성이 있습니다."},
+            {"type": "data_driven_strategy", "headline": "{stock}의 데이터 기반 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "빅데이터와 인공지능을 활용한 전략이 {stock}의 운영 효율성을 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "market_restructuring", "headline": "{stock}의 시장 구조 재편이 주가에 긍정적으로 작용할 수 있습니다.", "details": "산업 내 재편이 {stock}의 경쟁 환경을 개선하여 주가 상승에 기여할 가능성이 있습니다."},
+            {"type": "innovative_supply_chain", "headline": "{stock}의 혁신적인 공급망 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "새로운 공급망 전략이 {stock}의 생산성과 효율성을 높여 주가 상승에 기여할 가능성이 있습니다."},
+            {"type": "market_rationalization", "headline": "{stock}의 시장 합리화 움직임이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "시장 내 불필요한 경쟁 요소 제거가 {stock}의 주가에 긍정적인 영향을 미칠 수 있습니다."},
+            {"type": "innovative_financial_products", "headline": "{stock}의 혁신적인 금융 상품 출시가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "새로운 금융 상품이 {stock}의 매출과 수익성을 개선하여 주가 상승에 기여할 수 있습니다."},
+            {"type": "risk_management", "headline": "{stock}의 리스크 관리 강화가 주가에 긍정적으로 작용할 수 있습니다.", "details": "효과적인 리스크 관리가 {stock}의 안정적인 성과에 기여하여 주가 상승에 긍정적인 영향을 미칠 수 있습니다."},
+            {"type": "sustainable_growth", "headline": "{stock}의 지속 가능한 성장 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "지속 가능한 성장 전략이 {stock}의 장기적인 경쟁력을 강화하여 주가 상승에 기여할 수 있습니다."},
+            {"type": "innovation_in_customer_service", "headline": "{stock}의 고객 서비스 혁신이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "고객 서비스 개선이 {stock}의 고객 만족도와 브랜드 충성도를 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "technology_integration", "headline": "{stock}의 최신 기술 통합이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "최신 기술의 통합이 {stock}의 운영 효율성을 향상시켜 주가 상승에 기여할 수 있습니다."},
+            {"type": "merger_strategy", "headline": "{stock}의 합병 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "효과적인 합병 전략이 {stock}의 시장 지배력을 강화하여 주가 상승에 기여할 수 있습니다."},
+            {"type": "innovation_in_marketing", "headline": "{stock}의 마케팅 혁신이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "창의적인 마케팅 전략이 {stock}의 브랜드 가치를 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "global_partnership", "headline": "{stock}의 글로벌 파트너십이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "글로벌 기업과의 협력이 {stock}의 해외 시장 확장에 기여하여 주가 상승 모멘텀을 강화할 수 있습니다."},
+            {"type": "strategic_investment", "headline": "{stock}의 전략적 투자 유치가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "유명 투자자로부터의 투자 유치가 {stock}의 성장 가능성을 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "profit_margin", "headline": "{stock}의 이익률 개선이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "높은 이익률이 {stock}의 재무 건전성을 개선하여 주가 상승에 기여할 수 있습니다."},
+            {"type": "innovation_in_distribution", "headline": "{stock}의 유통 혁신이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "효율적인 유통 시스템이 {stock}의 매출 증대로 이어져 주가 상승에 기여할 수 있습니다."},
+            {"type": "market_leadership", "headline": "{stock}의 시장 리더십이 주가 상승을 견인할 수 있습니다.", "details": "강력한 시장 리더십이 {stock}의 주가 상승 모멘텀을 강화할 수 있습니다."},
+            {"type": "strategic_diversification", "headline": "{stock}의 전략적 다각화가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "사업 영역 다각화가 {stock}의 성장 잠재력을 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "competitive_pricing", "headline": "{stock}의 경쟁력 있는 가격 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "가격 경쟁력이 {stock}의 시장 점유율 확대에 기여하여 주가 상승에 긍정적인 효과를 줄 수 있습니다."},
+            {"type": "cost_efficiency_strategy", "headline": "{stock}의 비용 효율성 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "효율적인 비용 관리가 {stock}의 이익 개선으로 이어져 주가 상승에 기여할 수 있습니다."},
+            {"type": "sustainability_reporting", "headline": "{stock}의 지속 가능성 보고가 투자자 신뢰를 높여 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "투명한 지속 가능성 보고가 {stock}의 기업 가치를 향상시켜 주가 상승에 기여할 수 있습니다."},
+            {"type": "innovative_business_model", "headline": "{stock}의 혁신적인 비즈니스 모델이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "새로운 비즈니스 모델 도입이 {stock}의 시장 경쟁력을 강화하여 주가 상승에 기여할 수 있습니다."},
+            {"type": "eco_trend_2", "headline": "{stock}의 친환경 제품 라인이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "친환경 제품 수요 증가가 {stock}의 매출과 주가에 긍정적인 효과를 줄 수 있습니다."},
+            {"type": "tech_trend", "headline": "{stock}의 최신 기술 트렌드가 주가 상승을 이끌 수 있습니다.", "details": "최신 기술 도입이 {stock}의 경쟁력을 강화하여 주가 상승에 기여할 가능성이 있습니다."},
+            {"type": "market_innovation", "headline": "{stock}의 혁신적인 시장 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "새로운 시장 전략이 {stock}의 매출 증대에 기여하여 주가 상승에 영향을 미칠 수 있습니다."},
+            {"type": "consumer_behavior", "headline": "{stock}의 소비자 행동 변화가 주가에 반영될 수 있습니다.", "details": "소비자 선호도 변화가 {stock}의 제품 판매에 긍정적인 영향을 줄 수 있습니다."},
+            {"type": "financial_health", "headline": "{stock}의 재무 건전성이 주가에 긍정적으로 작용할 수 있습니다.", "details": "안정적인 재무 상태가 {stock}의 주가 상승에 기여할 수 있습니다."},
+            {"type": "innovation_leadership", "headline": "{stock}의 혁신 리더십이 주가 상승 모멘텀을 강화할 수 있습니다.", "details": "혁신적인 경영진이 {stock}의 성장을 견인하여 주가 상승에 기여할 가능성이 있습니다."},
+            {"type": "cost_structure", "headline": "{stock}의 비용 구조 개선이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "효율적인 비용 구조 개선이 {stock}의 이익률을 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "market_dynamics", "headline": "시장 역학 변화가 {stock}의 주가에 반영될 수 있습니다.", "details": "시장 내 역학 변화가 {stock}의 주가 변동에 영향을 줄 수 있습니다."},
+            {"type": "customer_satisfaction", "headline": "{stock}의 고객 만족도가 주가에 긍정적으로 작용할 수 있습니다.", "details": "높은 고객 만족도가 {stock}의 브랜드 가치를 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "strategic_planning", "headline": "{stock}의 전략적 계획이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "장기 전략이 {stock}의 성장 전망에 긍정적인 신호를 줄 수 있습니다."},
+            {"type": "global_expansion_plan", "headline": "{stock}의 글로벌 확장 계획이 주가에 반영될 수 있습니다.", "details": "해외 시장 진출이 {stock}의 매출 증대와 주가 상승에 기여할 수 있습니다."},
+            {"type": "technology_adoption", "headline": "{stock}의 신기술 채택이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "신기술 도입이 {stock}의 효율성과 경쟁력을 강화하여 주가 상승에 기여할 수 있습니다."},
+            {"type": "innovation_integration", "headline": "{stock}의 혁신 통합 전략이 주가에 긍정적으로 작용할 수 있습니다.", "details": "다양한 혁신 전략이 {stock}의 시장 경쟁력을 높여 주가 상승에 기여할 수 있습니다."},
+            {"type": "customer_retention", "headline": "{stock}의 고객 유지 전략이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "효과적인 고객 유지 정책이 {stock}의 안정적인 매출에 기여하여 주가 상승에 긍정적인 효과를 줄 수 있습니다."},
+            {"type": "market_volatility_control", "headline": "{stock}의 변동성 관리 전략이 주가에 긍정적으로 작용할 수 있습니다.", "details": "효과적인 변동성 관리가 {stock}의 주가 안정에 기여할 수 있습니다."},
+            {"type": "innovation_forecasting", "headline": "{stock}의 혁신 예측이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "미래 혁신 전략이 {stock}의 성장 가능성을 높여 주가 상승에 기여할 수 있습니다."}
         ]
 
         # 생성할 뉴스 항목의 개수를 3~5개 사이로 결정 (종목이 부족하면 모두 사용)

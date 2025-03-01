@@ -149,7 +149,7 @@ class StockNews(commands.Cog):
             {"type": "market_rebound", "headline": "과거 주가 하락 이후 {stock}의 주가가 반등할 수 있습니다.", "details": "과거 조정 이후 {stock}의 주가가 반등할 가능성이 있으며, 투자자들이 이에 주목할 수 있습니다."},
             {"type": "tech_leadership", "headline": "{stock}의 기술 리더십이 주가 상승을 견인할 수 있습니다.", "details": "강력한 기술 리더십이 {stock}의 경쟁력 강화에 기여하여 주가 상승에 긍정적으로 작용할 수 있습니다."},
             {"type": "innovation_pipeline", "headline": "{stock}의 혁신적인 제품 파이프라인이 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "혁신적인 제품 개발 계획이 {stock}의 장기 성장에 기여하여 주가 상승을 이끌 수 있습니다."},
-            {"type": "sector_growth", "headline": "해당 산업 섹터의 성장 전망이 {stock}의 주가에 긍정적으로 반영될 수 있습니다.", "details": "산업 섹터 내 성장 전망이 {stock}의 주가 상승에 기여할 가능성이 있습니다."}
+            {"type": "sector_growth", "headline": "해당 산업 섹터의 성장 전망이 {stock}의 주가에 긍정적으로 반영될 수 있습니다.", "details": "산업 섹터 내 성장 전망이 {stock}의 주가 상승에 기여할 가능성이 있습니다."},
             {"type": "eco_trend", "headline": "{stock}의 친환경 트렌드가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "최근 친환경 정책과 소비자 선호도가 {stock}의 사업에 긍정적인 영향을 미쳐 주가 상승 가능성이 있습니다."},
             {"type": "tech_investment", "headline": "{stock}의 기술 투자 확대가 주가 상승 모멘텀을 강화할 수 있습니다.", "details": "첨단 기술 투자로 인해 {stock}의 경쟁력이 강화되어 주가에 긍정적인 영향을 미칠 가능성이 있습니다."},
             {"type": "supply_chain_optimization", "headline": "{stock}의 공급망 최적화가 주가에 긍정적인 영향을 줄 수 있습니다.", "details": "효율적인 공급망 관리가 {stock}의 생산성을 높여 주가 상승에 기여할 수 있습니다."},

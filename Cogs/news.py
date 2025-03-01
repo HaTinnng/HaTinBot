@@ -41,9 +41,7 @@ class StockNews(commands.Cog):
     def generate_news(self):
         """
         DB의 상장된 주식 종목 중 무작위로 몇 종목을 선택하여,
-        100개의 다양한 뉴스 템플릿 중 하나를 적용해 헤드라인과 상세 설명을 생성합니다.
-        템플릿에는 "예상됩니다", "보입니다", "추정됩니다", "가능성이 있습니다" 등 다양한 미래 예측 표현이 사용됩니다.
-        생성된 뉴스는 MongoDB의 "news" 컬렉션에 저장됩니다.
+        100개의 다양한 뉴스 템플릿 중 하나를 적용해 헤드라인과 상세 설명
         """
         stocks = list(self.db.stocks.find({"listed": True}))
         if not stocks:
@@ -190,7 +188,6 @@ class StockNews(commands.Cog):
     async def news_command(self, ctx):
         """
         #뉴스: 최신 뉴스 항목들을 Embed 형태로 출력합니다.
-        각 뉴스는 헤드라인과 상세 설명을 포함하여 꾸며진 Embed에 추가됩니다.
         """
         # DB에서 가장 최신 뉴스 문서를 조회합니다.
         latest_news = self.db.news.find_one(sort=[("timestamp", -1)])

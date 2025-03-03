@@ -135,10 +135,6 @@ class PokerGame(commands.Cog):
         """
         트리플, 투 페어, 원 페어, 하이 카드일 경우,
         해당 조합의 실제 카드들 중 가장 높은(주요) 조합만 출력합니다.
-        - 트리플: 트리플에 해당하는 3장의 카드만 표시
-        - 투 페어: 두 쌍의 카드만 표시
-        - 원 페어: 쌍에 해당하는 카드만 표시
-        - 하이 카드: 가장 높은 한 장의 카드만 표시
         """
         evaluation = self.evaluate_hand(hand)
         rank = evaluation[0]

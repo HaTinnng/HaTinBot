@@ -133,8 +133,12 @@ class PokerGame(commands.Cog):
 
     def get_hand_details(self, hand):
         """
-        트리플, 투 페어, 원 페어, 하이 카드의 경우,
-        해당 카드 조합의 실제 카드들을 함께 표시합니다.
+        트리플, 투 페어, 원 페어, 하이 카드일 경우,
+        해당 조합의 실제 카드들 중 가장 높은(주요) 조합만 출력합니다.
+        - 트리플: 트리플에 해당하는 3장의 카드만 표시
+        - 투 페어: 두 쌍의 카드만 표시
+        - 원 페어: 쌍에 해당하는 카드만 표시
+        - 하이 카드: 가장 높은 한 장의 카드만 표시
         """
         evaluation = self.evaluate_hand(hand)
         rank = evaluation[0]
@@ -146,31 +150,23 @@ class PokerGame(commands.Cog):
         counts = {v: len(cards_by_value[v]) for v in cards_by_value}
         sorted_counts = sorted(counts.items(), key=lambda x: (x[1], x[0]), reverse=True)
         
-        if rank == 3:  # 트리플
+        if rank == 3:  # 트리플: 트리플에 해당하는 3장의 카드만
             three_val = sorted_counts[0][0]
             triple_cards = cards_by_value[three_val]
-            # 트리플에 속하지 않는 나머지 카드(킥커)들
-            kickers = sorted([card for card in hand if card[0] != three_val], key=lambda card: card[0], reverse=True)
-            kicker_cards = [self.card_to_str(card) for card in kickers]
-            return f"{basic_rank} ({', '.join(triple_cards)}) 하이카드 ({', '.join(kicker_cards)})"
-        elif rank == 2:  # 투 페어
+            return f"{basic_rank} ({', '.join(triple_cards)})"
+        elif rank == 2:  # 투 페어: 두 쌍의 카드만 표시
             pair_val1 = sorted_counts[0][0]
             pair_val2 = sorted_counts[1][0]
             pair_cards = cards_by_value[pair_val1] + cards_by_value[pair_val2]
-            kickers = sorted([card for card in hand if card[0] not in (pair_val1, pair_val2)], key=lambda card: card[0], reverse=True)
-            kicker_cards = [self.card_to_str(card) for card in kickers]
-            kicker_str = ', '.join(kicker_cards) if kicker_cards else ""
-            return f"{basic_rank} ({', '.join(pair_cards)}) 하이카드 ({kicker_str})"
-        elif rank == 1:  # 원 페어
+            return f"{basic_rank} ({', '.join(pair_cards)})"
+        elif rank == 1:  # 원 페어: 쌍에 해당하는 카드만 표시
             pair_val = sorted_counts[0][0]
             pair_cards = cards_by_value[pair_val]
-            kickers = sorted([card for card in hand if card[0] != pair_val], key=lambda card: card[0], reverse=True)
-            kicker_cards = [self.card_to_str(card) for card in kickers]
-            return f"{basic_rank} ({', '.join(pair_cards)}) 하이카드 ({', '.join(kicker_cards)})"
-        elif rank == 0:  # 하이 카드
+            return f"{basic_rank} ({', '.join(pair_cards)})"
+        elif rank == 0:  # 하이 카드: 가장 높은 한 장의 카드만 표시
             sorted_hand = sorted(hand, key=lambda card: card[0], reverse=True)
-            high_cards = [self.card_to_str(card) for card in sorted_hand]
-            return f"{basic_rank} ({', '.join(high_cards)})"
+            highest_card = self.card_to_str(sorted_hand[0])
+            return f"{basic_rank} ({highest_card})"
         else:
             return basic_rank
 
@@ -229,7 +225,7 @@ class PokerGame(commands.Cog):
         result = self.compare_hands(player_hand, dealer_hand)
         player_eval = self.evaluate_hand(player_hand)
         dealer_eval = self.evaluate_hand(dealer_hand)
-        # 트리플, 투 페어, 원 페어, 하이 카드인 경우엔 상세 카드 조합을 표시합니다.
+        # 트리플, 투 페어, 원 페어, 하이 카드의 경우, 상세 조합 중 최고만 출력
         if player_eval[0] in [3, 2, 1, 0]:
             player_hand_detail = self.get_hand_details(player_hand)
         else:
@@ -259,7 +255,7 @@ class PokerGame(commands.Cog):
         player_cards_str = " ".join(self.card_to_str(card) for card in player_hand)
         dealer_cards_str = " ".join(self.card_to_str(card) for card in dealer_hand)
         
-        # 결과 임베드 메시지 전송 (각각의 카드와 패 조합 세부 정보 포함)
+        # 결과 임베드 메시지 전송 (각각의 카드와 평가된 조합 세부 정보 포함)
         embed = discord.Embed(
             title="포커 게임 결과", 
             color=discord.Color.green() if result == "win" else discord.Color.red() if result == "lose" else discord.Color.blue()

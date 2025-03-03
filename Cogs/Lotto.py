@@ -129,9 +129,9 @@ class Lotto(commands.Cog):
         return candidate
 
     @commands.command(name="복권구매")
-    async def buy_lotto(self, ctx, ticket_count: int):
+    async def buy_lotto(self, ctx, ticket_arg: str):
         """
-        #복권구매 [n] : 1장당 5,000원, 최대 30장까지 구매 가능
+        #복권구매 [숫자 또는 다/전부/올인] : 1장당 5,000원, 최대 30장까지 구매 가능
         ※ 복권은 주식 돈을 사용하지만, 복권 명령어는 언제든 사용할 수 있습니다.
         """
         user_id = str(ctx.author.id)
@@ -148,24 +148,41 @@ class Lotto(commands.Cog):
             await ctx.send("❌ 주식 게임에 참가하지 않았습니다. `#주식참가`를 먼저 입력하세요!")
             return
 
-        if ticket_count <= 0:
-            await ctx.send("❌ 최소 1장 이상 구매해야 합니다!")
-            return
-
-        if ticket_count > 30:
-            await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니다!")
-            return
-
-        cost = ticket_count * 5000
-
+        special_keywords = ["다", "전부", "올인"]
         current_week = now.strftime("%Y-%W")
         doc_id = f"{user_id}_{current_week}"
         user_lotto = self.db.lotto.find_one({"_id": doc_id})
+        already_bought = len(user_lotto["tickets"]) if user_lotto and user_lotto.get("tickets") else 0
 
-        if user_lotto:
-            if len(user_lotto["tickets"]) + ticket_count > 30:
+        if ticket_arg in special_keywords:
+            available_money = user.get("money", 0)
+            max_affordable = available_money // 5000
+            remaining_limit = 30 - already_bought
+            ticket_count = min(max_affordable, remaining_limit)
+            if ticket_count <= 0:
+                await ctx.send("❌ 구매 가능한 복권 티켓이 없습니다. (자금 부족 또는 최대 구매량 도달)")
+                return
+        else:
+            try:
+                ticket_count = int(ticket_arg)
+            except ValueError:
+                await ctx.send("❌ 구매할 복권 티켓 수는 숫자 또는 '다', '전부', '올인' 중 하나여야 합니다!")
+                return
+
+            if ticket_count <= 0:
+                await ctx.send("❌ 최소 1장 이상 구매해야 합니다!")
+                return
+            if ticket_count > 30:
                 await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니다!")
                 return
+            if already_bought + ticket_count > 30:
+                await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니다!")
+                return
+
+        cost = ticket_count * 5000
+        if user.get("money", 0) < cost:
+            await ctx.send("❌ 보유한 현금이 부족합니다!")
+            return
 
         # 1~45 중 6개 랜덤 선택으로 복권 티켓 생성
         tickets = [sorted(random.sample(range(1, 46), 6)) for _ in range(ticket_count)]

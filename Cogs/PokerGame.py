@@ -4,7 +4,6 @@ import discord
 from discord.ext import commands
 from pymongo import MongoClient
 
-# 카드 평가 관련 함수들
 # 카드: (value, suit) 형태, value는 2~14 (11:J, 12:Q, 13:K, 14:A), suit는 "♠", "♥", "♦", "♣"
 
 class PokerGame(commands.Cog):
@@ -132,6 +131,49 @@ class PokerGame(commands.Cog):
         elif rank == 0:
             return "하이 카드"
 
+    def get_hand_details(self, hand):
+        """
+        트리플, 투 페어, 원 페어, 하이 카드의 경우,
+        해당 카드 조합의 실제 카드들을 함께 표시합니다.
+        """
+        evaluation = self.evaluate_hand(hand)
+        rank = evaluation[0]
+        basic_rank = self.get_hand_rank_name(evaluation)
+        # hand 내 카드들을 value별로 그룹화 (문자열 형태)
+        cards_by_value = {}
+        for card in hand:
+            cards_by_value.setdefault(card[0], []).append(self.card_to_str(card))
+        counts = {v: len(cards_by_value[v]) for v in cards_by_value}
+        sorted_counts = sorted(counts.items(), key=lambda x: (x[1], x[0]), reverse=True)
+        
+        if rank == 3:  # 트리플
+            three_val = sorted_counts[0][0]
+            triple_cards = cards_by_value[three_val]
+            # 트리플에 속하지 않는 나머지 카드(킥커)들
+            kickers = sorted([card for card in hand if card[0] != three_val], key=lambda card: card[0], reverse=True)
+            kicker_cards = [self.card_to_str(card) for card in kickers]
+            return f"{basic_rank} ({', '.join(triple_cards)}) 하이카드 ({', '.join(kicker_cards)})"
+        elif rank == 2:  # 투 페어
+            pair_val1 = sorted_counts[0][0]
+            pair_val2 = sorted_counts[1][0]
+            pair_cards = cards_by_value[pair_val1] + cards_by_value[pair_val2]
+            kickers = sorted([card for card in hand if card[0] not in (pair_val1, pair_val2)], key=lambda card: card[0], reverse=True)
+            kicker_cards = [self.card_to_str(card) for card in kickers]
+            kicker_str = ', '.join(kicker_cards) if kicker_cards else ""
+            return f"{basic_rank} ({', '.join(pair_cards)}) 하이카드 ({kicker_str})"
+        elif rank == 1:  # 원 페어
+            pair_val = sorted_counts[0][0]
+            pair_cards = cards_by_value[pair_val]
+            kickers = sorted([card for card in hand if card[0] != pair_val], key=lambda card: card[0], reverse=True)
+            kicker_cards = [self.card_to_str(card) for card in kickers]
+            return f"{basic_rank} ({', '.join(pair_cards)}) 하이카드 ({', '.join(kicker_cards)})"
+        elif rank == 0:  # 하이 카드
+            sorted_hand = sorted(hand, key=lambda card: card[0], reverse=True)
+            high_cards = [self.card_to_str(card) for card in sorted_hand]
+            return f"{basic_rank} ({', '.join(high_cards)})"
+        else:
+            return basic_rank
+
     def compare_hands(self, player_hand, dealer_hand):
         """플레이어와 딜러의 핸드를 평가하여 승패를 결정합니다."""
         eval_player = self.evaluate_hand(player_hand)
@@ -185,15 +227,20 @@ class PokerGame(commands.Cog):
         
         # 핸드 평가 및 승패 결정
         result = self.compare_hands(player_hand, dealer_hand)
-        # 플레이어와 딜러의 핸드 평가 결과(튜플) 및 이름
         player_eval = self.evaluate_hand(player_hand)
         dealer_eval = self.evaluate_hand(dealer_hand)
-        player_hand_name = self.get_hand_rank_name(player_eval)
-        dealer_hand_name = self.get_hand_rank_name(dealer_eval)
+        # 트리플, 투 페어, 원 페어, 하이 카드인 경우엔 상세 카드 조합을 표시합니다.
+        if player_eval[0] in [3, 2, 1, 0]:
+            player_hand_detail = self.get_hand_details(player_hand)
+        else:
+            player_hand_detail = self.get_hand_rank_name(player_eval)
+        if dealer_eval[0] in [3, 2, 1, 0]:
+            dealer_hand_detail = self.get_hand_details(dealer_hand)
+        else:
+            dealer_hand_detail = self.get_hand_rank_name(dealer_eval)
         
         # 결과에 따른 현금 처리
         if result == "win":
-            # 승리 시 베팅액만큼 이익을 얻어, 반환된 금액은 베팅액*2
             winnings = bet_amount * 2
             outcome_message = f"축하합니다! 포커에서 승리하셨습니다. {bet_amount:,}원의 이익을 얻어 총 {winnings:,}원을 받습니다."
             new_money += bet_amount * 2
@@ -212,15 +259,15 @@ class PokerGame(commands.Cog):
         player_cards_str = " ".join(self.card_to_str(card) for card in player_hand)
         dealer_cards_str = " ".join(self.card_to_str(card) for card in dealer_hand)
         
-        # 결과 임베드 메시지 전송 (카드와 함께 패 종류도 추가)
+        # 결과 임베드 메시지 전송 (각각의 카드와 패 조합 세부 정보 포함)
         embed = discord.Embed(
             title="포커 게임 결과", 
             color=discord.Color.green() if result == "win" else discord.Color.red() if result == "lose" else discord.Color.blue()
         )
         embed.add_field(name="당신의 카드", value=player_cards_str, inline=False)
-        embed.add_field(name="당신의 패", value=player_hand_name, inline=False)
+        embed.add_field(name="당신의 패", value=player_hand_detail, inline=False)
         embed.add_field(name="딜러의 카드", value=dealer_cards_str, inline=False)
-        embed.add_field(name="딜러의 패", value=dealer_hand_name, inline=False)
+        embed.add_field(name="딜러의 패", value=dealer_hand_detail, inline=False)
         embed.add_field(name="결과", value=outcome_message, inline=False)
         embed.set_footer(text=f"남은 현금: {new_money:,}원")
         await ctx.send(embed=embed)

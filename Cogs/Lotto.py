@@ -199,31 +199,55 @@ class Lotto(commands.Cog):
     async def check_lotto(self, ctx):
         """
         #복권확인 : 본인의 복권 번호 및 당첨 여부 확인 (추첨 전에도 확인 가능)
-        지난주와 이번주 구매 내역을 각각 표시합니다.
+        구매 내역을 추첨일 기준으로 분리하여 표시합니다.
+        당첨 번호가 기록된 티켓은 '지난주', 아직 추첨되지 않은 티켓은 '이번주'로 분류됩니다.
         """
         user_id = str(ctx.author.id)
         now = self.get_seoul_time()
         current_week = now.strftime("%Y-%W")
         last_week = (now - timedelta(weeks=1)).strftime("%Y-%W")
+        
+        # 사용자 복권 구매 내역 조회 (현재 주와 지난 주)
         doc_id_current = f"{user_id}_{current_week}"
         doc_id_last = f"{user_id}_{last_week}"
-
-        # 지난주 복권 구매 내역
+        user_lotto_current = self.db.lotto.find_one({"_id": doc_id_current})
         user_lotto_last = self.db.lotto.find_one({"_id": doc_id_last})
+        
+        # 각 주의 당첨 결과 여부 확인
+        result_current = self.db.lotto_result.find_one({"_id": current_week})
+        result_last = self.db.lotto_result.find_one({"_id": last_week})
+        
+        drawn_tickets_lines = []    # 당첨 번호가 이미 발표된 티켓 (지난주)
+        undrawn_tickets_lines = []  # 아직 당첨번호 발표 전 티켓 (이번주)
+        
+        # 지난 주 복권 내역 처리
         if user_lotto_last and user_lotto_last.get("tickets"):
-            tickets = user_lotto_last["tickets"]
-            ticket_lines = [f"🎟 `{i+1}번`: `{ticket}`" for i, ticket in enumerate(tickets)]
-            view = PaginationView(ticket_lines, title=f"지난주({last_week}) 복권 구매 내역")
+            if result_last:  # 지난 주 당첨 번호가 존재하면 이미 추첨된 티켓
+                ticket_lines = [f"🎟 `{i+1}번`: `{ticket}`" for i, ticket in enumerate(user_lotto_last["tickets"])]
+                drawn_tickets_lines.extend(ticket_lines)
+            else:  # 드물지만 결과가 없는 경우 undrawn 처리
+                ticket_lines = [f"🎟 `{i+1}번`: `{ticket}`" for i, ticket in enumerate(user_lotto_last["tickets"])]
+                undrawn_tickets_lines.extend(ticket_lines)
+        
+        # 이번 주 복권 내역 처리
+        if user_lotto_current and user_lotto_current.get("tickets"):
+            if result_current:  # 당첨 결과가 있으면 이미 추첨된 것으로 간주
+                ticket_lines = [f"🎟 `{i+1}번`: `{ticket}`" for i, ticket in enumerate(user_lotto_current["tickets"])]
+                drawn_tickets_lines.extend(ticket_lines)
+            else:
+                ticket_lines = [f"🎟 `{i+1}번`: `{ticket}`" for i, ticket in enumerate(user_lotto_current["tickets"])]
+                undrawn_tickets_lines.extend(ticket_lines)
+        
+        # 지난주(추첨 완료) 티켓 표시
+        if drawn_tickets_lines:
+            view = PaginationView(drawn_tickets_lines, title="지난주 복권 구매 내역")
             await ctx.send(content=view.get_page_content(), view=view)
         else:
             await ctx.send("🎟 지난주에 구매한 복권이 없습니다!")
-
-        # 이번주 복권 구매 내역
-        user_lotto_current = self.db.lotto.find_one({"_id": doc_id_current})
-        if user_lotto_current and user_lotto_current.get("tickets"):
-            tickets = user_lotto_current["tickets"]
-            ticket_lines = [f"🎟 `{i+1}번`: `{ticket}`" for i, ticket in enumerate(tickets)]
-            view = PaginationView(ticket_lines, title=f"이번주({current_week}) 복권 구매 내역")
+        
+        # 이번주(추첨 전) 티켓 표시
+        if undrawn_tickets_lines:
+            view = PaginationView(undrawn_tickets_lines, title="이번주 복권 구매 내역")
             await ctx.send(content=view.get_page_content(), view=view)
         else:
             await ctx.send("🎟 이번 주에 구매한 복권이 없습니다!")

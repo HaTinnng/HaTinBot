@@ -243,7 +243,7 @@ class RaceBetting(commands.Cog):
         if not selected_horse:
             await ctx.send("존재하지 않는 말입니다. `#경마정보` 명령어로 말 목록을 확인해주세요.")
             return
-        special_bet = ["all", "전부", "올인"]
+        special_bet = ["all", "전부", "올인", "다"]
         user_money = user.get("money", 0)
         try:
             if amount.lower() in special_bet:

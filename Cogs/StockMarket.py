@@ -599,9 +599,9 @@ class StockMarket(commands.Cog):
 
             # 가격 변동 아이콘
             if stock.get("last_change", 0) > 0:
-                arrow = f"🔺{abs(stock['last_change'])}"
+                arrow = f"🔺{abs(stock['last_change']):,}"
             elif stock.get("last_change", 0) < 0:
-                arrow = f"🔻{abs(stock['last_change'])}"
+                arrow = f"🔻{abs(stock['last_change']):,}"
             else:
                 arrow = "⏺0"
             

@@ -338,5 +338,26 @@ class RaceBetting(commands.Cog):
             msg_lines.append(line)
         await ctx.send("\n".join(msg_lines))
 
+    @commands.command(name="경마")
+    async def race_help(self, ctx):
+        """
+        #경마:
+        경마 게임에 대한 도움말을 표시합니다.
+        """
+        msg_lines = [
+            "**경마 게임 도움말**",
+            "",
+            "**사용 가능한 명령어:**",
+            "- `#경마정보`: 현재 진행 중인 경마 경기 정보 확인 (경기 시작 시간, 말 목록, 자동 경마 시작 예정 시간 등)",
+            "- `#베팅 [말 번호 또는 이름] [금액 또는 all/전부/올인]`: 선택한 말에 베팅",
+            "- `#내베팅`: 현재 경기에서 본인의 베팅 내역 확인",
+            "- `#경마시작`: 관리자가 수동으로 경기 결과를 결정하여 경마 진행 (자동 경마는 매일 오후 6시에 진행됩니다)",
+            "- `#경마결과`: 최근 5회의 경마 결과 확인 (베팅 성공 여부 및 획득 금액 포함)",
+            "",
+            "경마 베팅은 시즌 기간 (매월 1일 0시 10분 ~ 26일 0시 10분) 동안에만 이용 가능합니다.",
+            "자동 경마는 매일 오후 6시(18:00)에 진행됩니다."
+        ]
+        await ctx.send("\n".join(msg_lines))
+
 async def setup(bot):
     await bot.add_cog(RaceBetting(bot))

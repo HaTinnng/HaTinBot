@@ -110,6 +110,28 @@ class PokerGame(commands.Cog):
         rank = 0
         return (rank, values)
 
+    def get_hand_rank_name(self, evaluation):
+        """평가 튜플을 받아 해당 핸드의 이름을 반환합니다."""
+        rank = evaluation[0]
+        if rank == 8:
+            return "스트레이트 플러시"
+        elif rank == 7:
+            return "포카드"
+        elif rank == 6:
+            return "풀 하우스"
+        elif rank == 5:
+            return "플러시"
+        elif rank == 4:
+            return "스트레이트"
+        elif rank == 3:
+            return "트리플"
+        elif rank == 2:
+            return "투 페어"
+        elif rank == 1:
+            return "원 페어"
+        elif rank == 0:
+            return "하이 카드"
+
     def compare_hands(self, player_hand, dealer_hand):
         """플레이어와 딜러의 핸드를 평가하여 승패를 결정합니다."""
         eval_player = self.evaluate_hand(player_hand)
@@ -163,6 +185,11 @@ class PokerGame(commands.Cog):
         
         # 핸드 평가 및 승패 결정
         result = self.compare_hands(player_hand, dealer_hand)
+        # 플레이어와 딜러의 핸드 평가 결과(튜플) 및 이름
+        player_eval = self.evaluate_hand(player_hand)
+        dealer_eval = self.evaluate_hand(dealer_hand)
+        player_hand_name = self.get_hand_rank_name(player_eval)
+        dealer_hand_name = self.get_hand_rank_name(dealer_eval)
         
         # 결과에 따른 현금 처리
         if result == "win":
@@ -185,13 +212,15 @@ class PokerGame(commands.Cog):
         player_cards_str = " ".join(self.card_to_str(card) for card in player_hand)
         dealer_cards_str = " ".join(self.card_to_str(card) for card in dealer_hand)
         
-        # 결과 임베드 메시지 전송
+        # 결과 임베드 메시지 전송 (카드와 함께 패 종류도 추가)
         embed = discord.Embed(
             title="포커 게임 결과", 
             color=discord.Color.green() if result == "win" else discord.Color.red() if result == "lose" else discord.Color.blue()
         )
         embed.add_field(name="당신의 카드", value=player_cards_str, inline=False)
+        embed.add_field(name="당신의 패", value=player_hand_name, inline=False)
         embed.add_field(name="딜러의 카드", value=dealer_cards_str, inline=False)
+        embed.add_field(name="딜러의 패", value=dealer_hand_name, inline=False)
         embed.add_field(name="결과", value=outcome_message, inline=False)
         embed.set_footer(text=f"남은 현금: {new_money:,}원")
         await ctx.send(embed=embed)

@@ -6,7 +6,7 @@ import asyncio
 from pymongo import MongoClient
 
 # ===== 상수 설정 =====
-RACE_TRACK_LENGTH = 35      # 시작점(|)과 도착점(🏁) 사이의 칸 수 (35칸)
+RACE_TRACK_LENGTH = 40      # 시작점(|)과 도착점(🏁) 사이의 칸 수 (40칸)
 RACE_DELAY = 1              # 레이스 진행 시 업데이트 간격 (초)
 AUTO_START_DELAY = 120      # 방 생성 후 자동 시작까지 대기 시간 (2분)
 
@@ -138,6 +138,34 @@ class MultiRaceGame(commands.Cog):
         await ctx.send("수동 명령으로 레이스를 시작합니다!")
         await self.start_race()
 
+    @commands.command(name="레이스방")
+    async def race_room(self, ctx):
+        """
+        #레이스방:
+        현재 생성되어 있는 레이스 방의 정보를 출력합니다.
+        - 방장(첫 참가자)
+        - 베팅액
+        - 참가자 수 및 참가자 목록
+        """
+        if self.current_race is None:
+            await ctx.send("현재 생성된 레이스 방이 없습니다.")
+            return
+        
+        participants = self.current_race.get("participants", [])
+        room_bet = self.current_race.get("room_bet", 0)
+        leader = participants[0]["username"] if participants else "없음"
+        num_participants = len(participants)
+        participant_names = ", ".join([p["username"] for p in participants]) if participants else "없음"
+
+        info = (
+            f"**현재 레이스 방 정보**\n"
+            f"방장: {leader}\n"
+            f"베팅액: {room_bet:,}원{' (무료)' if room_bet == 0 else ''}\n"
+            f"참가자 수: {num_participants}\n"
+            f"참가자: {participant_names}"
+        )
+        await ctx.send(info)
+
     async def start_race(self):
         """실제 레이스 시뮬레이션을 진행하고, 우승자에게 베팅 풀 금액을 지급합니다."""
         if self.current_race is None or len(self.current_race["participants"]) == 0:
@@ -159,7 +187,7 @@ class MultiRaceGame(commands.Cog):
         while not finished:
             for participant in participants:
                 # 각 참가자가 0~5칸씩 전진
-                participant["position"] += random.randint(0, 5)
+                participant["position"] += random.randint(1, 4)
                 if participant["position"] >= RACE_TRACK_LENGTH:
                     participant["position"] = RACE_TRACK_LENGTH
                     finished = True

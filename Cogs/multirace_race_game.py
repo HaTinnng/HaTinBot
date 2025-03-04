@@ -142,7 +142,6 @@ class MultiRaceGame(commands.Cog):
     async def race_room(self, ctx):
         """
         #레이스방:
-        현재 생성되어 있는 레이스 방의 정보를 출력합니다.
         - 방장(첫 참가자)
         - 베팅액
         - 참가자 수 및 참가자 목록
@@ -150,7 +149,7 @@ class MultiRaceGame(commands.Cog):
         if self.current_race is None:
             await ctx.send("현재 생성된 레이스 방이 없습니다.")
             return
-        
+
         participants = self.current_race.get("participants", [])
         room_bet = self.current_race.get("room_bet", 0)
         leader = participants[0]["username"] if participants else "없음"
@@ -158,11 +157,14 @@ class MultiRaceGame(commands.Cog):
         participant_names = ", ".join([p["username"] for p in participants]) if participants else "없음"
 
         info = (
-            f"**현재 레이스 방 정보**\n"
-            f"방장: {leader}\n"
-            f"베팅액: {room_bet:,}원{' (무료)' if room_bet == 0 else ''}\n"
-            f"참가자 수: {num_participants}\n"
-            f"참가자: {participant_names}"
+            "════════════════════════════════════════\n"
+            "            **🏁 현재 레이스 방 정보 🏁**\n"
+            "════════════════════════════════════════\n"
+            f"**방장**      : {leader}\n"
+            f"**베팅액**    : {room_bet:,}원{' (무료)' if room_bet == 0 else ''}\n"
+            f"**참가자 수** : {num_participants}\n"
+            f"**참가자**    : {participant_names}\n"
+            "════════════════════════════════════════"
         )
         await ctx.send(info)
 

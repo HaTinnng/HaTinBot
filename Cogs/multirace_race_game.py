@@ -53,7 +53,7 @@ class MultiRaceGame(commands.Cog):
             " - 승리 시 베팅 금액의 2배를 상금으로 획득합니다.\n"
             " - 베팅 금액은 즉시 차감됩니다.\n"
             "```\n"
-            "```diff\n"
+            "```css\n"
             "[ 멀티 레이스 게임 도움말 ]\n"
             "#레이스참가 [금액] : 방이 없을시 레이스 방을 생성합니다. (방 생성 시 베팅 금액 입력)\n"
             "#레이스참가 [0, .] : 무료로 레이스 방을 생성합니다. (베팅금 X)\n"
@@ -69,6 +69,7 @@ class MultiRaceGame(commands.Cog):
             "```"
         )
         await ctx.send(help_text)
+
 
     @commands.command(name="레이스참가")
     async def join_race(self, ctx, bet: str = None):
@@ -223,7 +224,7 @@ class MultiRaceGame(commands.Cog):
 
         while not finished:
             for participant in participants:
-                # 각 참가자가 1~4칸씩 전진
+                # 각 참가자가 0~5칸씩 전진
                 participant["position"] += random.randint(1, 4)
                 if participant["position"] >= RACE_TRACK_LENGTH:
                     participant["position"] = RACE_TRACK_LENGTH

@@ -6,13 +6,16 @@ import asyncio
 from pymongo import MongoClient
 
 # ===== 상수 설정 =====
-RACE_TRACK_LENGTH = 20      # 각 레인의 트랙 길이 (칸 수)
+RACE_TRACK_LENGTH = 20      # S와 🏁 사이의 칸 수
 RACE_DELAY = 1              # 레이스 진행 시 업데이트 간격 (초)
 AUTO_START_DELAY = 120      # 방 생성 후 자동 시작까지 대기 시간 (2분)
 
 # MongoDB 설정 (주식 게임과 동일 DB 사용)
 MONGO_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "stock_game"
+
+# 사용 가능한 동물 이모지 목록
+ANIMAL_EMOJIS = ["🐢", "🐇", "🦊", "🐼", "🐒", "🐰", "🦄", "🐻"]
 
 class MultiRaceGame(commands.Cog):
     def __init__(self, bot):
@@ -85,12 +88,13 @@ class MultiRaceGame(commands.Cog):
                 await ctx.send(f"{ctx.author.mention}, 이미 레이스에 참가하셨습니다.")
                 return
 
-        # 참가자 추가
+        # 참가자 추가 (랜덤 동물 이모지 할당)
         participant = {
             "user_id": user_id,
             "username": ctx.author.display_name,
             "bet": bet_amount,
-            "position": 0
+            "position": 0,
+            "emoji": random.choice(ANIMAL_EMOJIS)
         }
         self.current_race["participants"].append(participant)
         self.current_race["total_bet"] += bet_amount
@@ -148,13 +152,13 @@ class MultiRaceGame(commands.Cog):
                     winner = participant
                     break
 
-            # 레이스 진행 상황 표시 (참가자 수만큼 레인 생성)
-            display = "🏎️ **멀티 레이스 진행 상황** 🏁\n\n"
+            # 레이스 진행 상황 표시 (각 참가자별로 고정된 시작점과 도착점 사이에서 동물 이모지가 이동)
+            display = "🐾 **멀티 레이스 진행 상황** 🏁\n\n"
             for idx, participant in enumerate(participants, start=1):
-                progress = "─" * participant["position"]
-                remaining = " " * (RACE_TRACK_LENGTH - participant["position"])
-                finish_flag = "🏁" if participant["position"] >= RACE_TRACK_LENGTH else ""
-                display += f"레인 {idx} ({participant['username']}): |{progress}{finish_flag}{remaining}|\n"
+                pos = participant["position"]
+                # 고정된 시작점(S)과 도착점(🏁) 사이에 pos 칸만큼 '-' 표시 후 동물 이모지 삽입
+                track = "S" + "-" * pos + participant["emoji"] + "-" * (RACE_TRACK_LENGTH - pos) + "🏁"
+                display += f"레인 {idx} ({participant['username']}): {track}\n"
             await race_msg.edit(content=display)
             await asyncio.sleep(RACE_DELAY)
 

@@ -6,7 +6,7 @@ import asyncio
 from pymongo import MongoClient
 
 # ===== 상수 설정 =====
-RACE_TRACK_LENGTH = 30      # 시작점(|)과 도착점(🏁) 사이의 칸 수 (늘어남)
+RACE_TRACK_LENGTH = 35      # 시작점(|)과 도착점(🏁) 사이의 칸 수 (35칸)
 RACE_DELAY = 1              # 레이스 진행 시 업데이트 간격 (초)
 AUTO_START_DELAY = 120      # 방 생성 후 자동 시작까지 대기 시간 (2분)
 
@@ -32,52 +32,70 @@ class MultiRaceGame(commands.Cog):
         await asyncio.sleep(AUTO_START_DELAY)
         if self.current_race and not self.current_race.get("started", False):
             channel = self.current_race["channel"]
-            await channel.send("자동 시작 시간이 도래했습니다. 레이스를 시작합니다!")
+            await channel.send("⏰ 자동 시작 시간이 도래했습니다. 레이스를 시작합니다!")
             await self.start_race()
 
     @commands.command(name="레이스참가")
-    async def join_race(self, ctx, bet: str):
+    async def join_race(self, ctx, bet: str = None):
         """
         #레이스참가 [금액]:
         멀티 레이스 방에 참가합니다.
-        - 입력한 금액만큼 현금을 베팅하고, 방이 없으면 새 방을 생성합니다.
-        - 방이 생성되면 2분 후 자동으로 레이스가 시작됩니다.
+        - 새 방을 생성하는 경우, 베팅 금액을 입력해야 합니다.
+          (베팅 금액으로 '0' 또는 '.'를 입력하면 무료로 진행됩니다.)
+        - 이미 방이 존재하는 경우, 입력 없이 참가하면 방장이 설정한 금액과 동일하게 적용됩니다.
         """
-        try:
-            bet_amount = int(bet.replace(",", ""))
-            if bet_amount <= 0:
-                await ctx.send("베팅 금액은 1원 이상이어야 합니다.")
-                return
-        except Exception:
-            await ctx.send("베팅 금액을 올바르게 입력해주세요.")
-            return
-
         user_id = str(ctx.author.id)
+        # DB에서 사용자 조회 (주식 게임 참가 여부 확인)
         user = self.db.users.find_one({"_id": user_id})
         if not user:
             await ctx.send("주식 게임에 참가하지 않으셨습니다. 먼저 `#주식참가`를 사용해주세요.")
             return
 
-        cash = user.get("money", 0)
-        if cash < bet_amount:
-            await ctx.send("현금 잔액이 부족합니다.")
-            return
-
-        # 베팅 금액 차감
-        new_cash = cash - bet_amount
-        self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_cash}})
-
-        # 현재 진행 중인 레이스 방이 없거나 이미 시작된 경우 새 방 생성
+        # 새 방 생성 시 (현재 방이 없거나 이미 시작된 경우)
         if self.current_race is None or self.current_race.get("started", False):
+            if bet is None:
+                await ctx.send("새 방을 생성하려면 베팅 금액을 입력해야 합니다. 예: `#레이스참가 50000` 또는 무료로 진행하려면 `#레이스참가 0` 혹은 `#레이스참가 .`")
+                return
+            if bet in ["0", "."]:
+                bet_amount = 0
+            else:
+                try:
+                    bet_amount = int(bet.replace(",", ""))
+                    if bet_amount < 0:
+                        await ctx.send("베팅 금액은 0원 이상이어야 합니다.")
+                        return
+                except Exception:
+                    await ctx.send("베팅 금액을 올바르게 입력해주세요.")
+                    return
+            room_bet = bet_amount
             self.current_race = {
                 "participants": [],
                 "total_bet": 0,
+                "room_bet": room_bet,
                 "channel": ctx.channel,
                 "race_message": None,
                 "auto_start_task": None,
                 "started": False
             }
             self.current_race["auto_start_task"] = asyncio.create_task(self.auto_start_race())
+        else:
+            # 이미 생성된 방이 있는 경우, 베팅 금액은 방장이 설정한 금액으로 자동 적용
+            room_bet = self.current_race["room_bet"]
+            if bet is not None:
+                await ctx.send("이미 생성된 방이 있으므로, 베팅 금액은 방장이 설정한 금액과 동일하게 적용됩니다.")
+
+        # 사용자가 베팅할 금액에 대해 현금 잔액 확인 (무료 게임은 금액 확인 없이 진행)
+        cash = user.get("money", 0)
+        if room_bet > 0 and cash < room_bet:
+            await ctx.send("현금 잔액이 부족합니다.")
+            return
+
+        # 베팅 금액 차감 (무료 게임인 경우 차감하지 않음)
+        if room_bet > 0:
+            new_cash = cash - room_bet
+            self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_cash}})
+        else:
+            new_cash = cash
 
         # 중복 참가 체크
         for participant in self.current_race["participants"]:
@@ -89,14 +107,17 @@ class MultiRaceGame(commands.Cog):
         participant = {
             "user_id": user_id,
             "username": ctx.author.display_name,
-            "bet": bet_amount,
+            "bet": room_bet,
             "position": 0,
             "emoji": random.choice(ANIMAL_EMOJIS)
         }
         self.current_race["participants"].append(participant)
-        self.current_race["total_bet"] += bet_amount
+        self.current_race["total_bet"] += room_bet
 
-        await ctx.send(f"{ctx.author.mention}님이 {bet_amount:,}원을 베팅하고 레이스에 참가하셨습니다! (현재 참가자 수: {len(self.current_race['participants'])})")
+        # 꾸며진 메시지 출력
+        decoration = "✨🌟✨"
+        bet_text = f"{room_bet:,}원" if room_bet > 0 else "무료"
+        await ctx.send(f"{decoration} {ctx.author.mention}님이 {bet_text}을(를) 베팅하고 레이스에 참가하셨습니다! 🎉 (현재 참가자 수: {len(self.current_race['participants'])}) {decoration}")
 
     @commands.command(name="레이스시작")
     async def manual_start_race(self, ctx):
@@ -137,7 +158,7 @@ class MultiRaceGame(commands.Cog):
 
         while not finished:
             for participant in participants:
-                # 한 번에 전진하는 칸 수를 0~5
+                # 각 참가자가 0~5칸씩 전진
                 participant["position"] += random.randint(0, 5)
                 if participant["position"] >= RACE_TRACK_LENGTH:
                     participant["position"] = RACE_TRACK_LENGTH
@@ -157,14 +178,14 @@ class MultiRaceGame(commands.Cog):
         total_pool = self.current_race["total_bet"]
         winner_id = winner["user_id"]
         winner_name = winner["username"]
-        result_msg = f"레이스 종료! 우승자: {winner_name} (레인 {participants.index(winner)+1})\n"
+        result_msg = f"🏆 레이스 종료! 우승자: {winner_name} (레인 {participants.index(winner)+1})\n"
         result_msg += f"총 베팅금액 {total_pool:,}원을 우승자에게 지급합니다."
 
         winner_record = self.db.users.find_one({"_id": winner_id})
         if winner_record:
             updated_cash = winner_record.get("money", 0) + total_pool
             self.db.users.update_one({"_id": winner_id}, {"$set": {"money": updated_cash}})
-            result_msg += f"\n{winner_name}님의 새로운 현금 잔액: {updated_cash:,}원"
+            result_msg += f"\n🎉 {winner_name}님의 새로운 현금 잔액: {updated_cash:,}원"
 
         await channel.send(result_msg)
         self.current_race = None

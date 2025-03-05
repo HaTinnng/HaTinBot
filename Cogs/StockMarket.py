@@ -813,10 +813,10 @@ class StockMarket(commands.Cog):
         msg = (
             f"**{username}님의 프로필**\n"
             f"현금 잔액: {cash:,}원\n"
-            f"은행 예금: {bank:,}원\n"
-            f"대출 금액: {loan_amount:,}원\n"
+            f"은행 예금: {bank:,.0f}원\n"
+            f"대출 금액: {loan_amount:,.0f}원\n"
             f"보유 주식 총액: {total_stock_value:,}원\n"
-            f"전체 자산 (현금 + 예금 + 주식 - 대출): {total_assets:,}원\n\n"
+            f"전체 자산 (현금 + 예금 + 주식 - 대출): {total_assets:,.0f}원\n\n"
             f"보유 주식:\n{portfolio_str}\n"
             f"칭호: {titles_str}"
         )
@@ -1484,6 +1484,10 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="대출")
     async def take_loan(self, ctx, amount: str):
+        if '.' in amount:
+            await ctx.send("소수점 이하의 금액은 입력할 수 없습니다. 정수 금액만 입력해주세요.")
+            return
+        
         # 1. 시즌(거래 가능 시간) 체크
         try:
             if not self.is_trading_open():

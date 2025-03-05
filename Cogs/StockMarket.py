@@ -307,7 +307,7 @@ class StockMarket(commands.Cog):
     
     def update_stocks(self):
         """
-        모든 주식의 가격을 21.58% ~ -19.32% 변동폭 내에서 변동합니다.
+        모든 주식의 가격을 20.58% ~ -19.32% 변동폭 내에서 변동합니다.
         가격이 13원 미만이 되면 상장폐지되며, 가격이 0원이 되고 변동이 중단됩니다.
         """
         if not self.is_trading_open():
@@ -321,7 +321,7 @@ class StockMarket(commands.Cog):
                 continue  # 변동을 적용하지 않음
             
             old_price = stock["price"]
-            percent_change = random.uniform(-19.82, 21.58)  # 모든 주식 동일 변동폭 적용
+            percent_change = random.uniform(-19.82, 20.58)  # 모든 주식 동일 변동폭 적용
             new_price = int(old_price * (1 + percent_change / 100))
             new_price = max(new_price, 1)
             

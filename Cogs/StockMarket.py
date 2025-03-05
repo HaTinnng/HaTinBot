@@ -414,7 +414,12 @@ class StockMarket(commands.Cog):
         if now.hour == 0 and now.minute == 0:
             if self.last_interest_day != current_day:
                 # 모든 유저의 bank 필드에 0.5% 이자 적용 (예금 잔액 * 1.005)
-                result = self.db.users.update_many({}, {"$mul": {"bank": 1.005}})
+                result = self.db.users.update_many(
+                    {},
+                    [{
+                        "$set": {"bank": {"$floor": {"$multiply": ["$bank", 1.005]}}}
+                    }]
+                )
                 print(f"은행 예금 이자 적용: {result.modified_count}명의 유저에게 0.5% 이자 지급됨.")
                 self.last_interest_day = current_day
 

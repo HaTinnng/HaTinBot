@@ -722,7 +722,7 @@ class StockMarket(commands.Cog):
             return
 
         # 만약 stock_name에 "다" (또는 동의어)를 입력하면, 전체 포트폴리오의 주식을 매도합니다.
-        if stock_name.lower() in ["다", "전부", "전체"]:
+        if stock_name.lower() in ["다", "전부", "전체", "풀매도", "올인", "all"]:
             portfolio = user.get("portfolio", {})
             if not portfolio:
                 await ctx.send("판매할 주식이 없습니다.")
@@ -747,7 +747,7 @@ class StockMarket(commands.Cog):
             self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": {}}})
             await ctx.send(
                 f"{ctx.author.mention}님, 보유한 모든 주식을 매도하였습니다.\n"
-                f"총 {total_revenue:,}원을 획득하였습니다. (현재 잔액: {new_money:,}원)\n" +
+                f"총 {total_revenue:,}원을 획득하였습니다. (현재 잔액: {new_money:,.0f}원)\n" +
                 "\n".join(messages)
             )
             return

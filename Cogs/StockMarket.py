@@ -701,7 +701,7 @@ class StockMarket(commands.Cog):
             portfolio[stock["_id"]] = {"amount": buy_amount, "total_cost": total_cost}
 
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
-        await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {buy_amount}주 구매하였습니다. (총 {total_cost:,}원)")
+        await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {buy_amount:,.0f}주 구매하였습니다. (총 {total_cost:,}원)")
 
     @commands.command(name="주식판매",aliases=["매도"])
     async def sell_stock(self, ctx, stock_name: str, amount: str):
@@ -767,7 +767,7 @@ class StockMarket(commands.Cog):
             portfolio.pop(stock["_id"])
 
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
-        await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount}주 판매하여 {revenue:,}원을 획득하였습니다.")
+        await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount:,.0f}주 판매하여 {revenue:,}원을 획득하였습니다.")
 
     @commands.command(name="프로필", aliases=["보관함", "자산", "자본"])
     async def profile(self, ctx):
@@ -845,7 +845,7 @@ class StockMarket(commands.Cog):
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         msg_lines = ["**랭킹 TOP 10**"]
         for idx, (uid, total, uname) in enumerate(ranking_list[:10], start=1):
-            msg_lines.append(f"{idx}. {uname} (ID: {uid}) - {total:,}원")
+            msg_lines.append(f"{idx}. {uname} (ID: {uid}) - {total:,.0f}원")
         await ctx.send("\n".join(msg_lines))
 
     @commands.command(name="시즌")

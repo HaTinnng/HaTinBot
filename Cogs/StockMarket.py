@@ -812,7 +812,7 @@ class StockMarket(commands.Cog):
     
         msg = (
             f"**{username}님의 프로필**\n"
-            f"현금 잔액: {cash:,}원\n"
+            f"현금 잔액: {cash:,.0f}원\n"
             f"은행 예금: {bank:,.0f}원\n"
             f"대출 금액: {loan_amount:,.0f}원\n"
             f"보유 주식 총액: {total_stock_value:,}원\n"

@@ -703,12 +703,14 @@ class StockMarket(commands.Cog):
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
         await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {buy_amount:,.0f}주 구매하였습니다. (총 {total_cost:,}원)")
 
-    @commands.command(name="주식판매",aliases=["매도"])
-    async def sell_stock(self, ctx, stock_name: str, amount: str):
+    @commands.command(name="매도", aliases=["주식판매"])
+    async def sell_stock(self, ctx, stock_name: str, amount: str = None):
         """
-        #주식판매 [종목명] [수량 또는 all/전부/올인/다/풀매도]:
-        해당 주식 종목을 지정 수량 또는 전량 판매합니다.
+        #매도 [종목명 또는 다] [수량 또는 다]:
+        - 특정 종목의 주식을 지정 수량 또는 전량 판매합니다.
+        - 만약 종목명에 "다" (또는 "전부", "전체")를 입력하면, 사용자가 보유한 모든 주식을 매도합니다.
         """
+        # 거래 가능 여부 확인
         if not self.is_trading_open():
             await ctx.send("현재 주식 거래가 중단되어 있습니다. (시즌 종료 및 휴식 기간)")
             return
@@ -717,6 +719,42 @@ class StockMarket(commands.Cog):
         user = self.db.users.find_one({"_id": user_id})
         if not user:
             await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
+            return
+
+        # 만약 stock_name에 "다" (또는 동의어)를 입력하면, 전체 포트폴리오의 주식을 매도합니다.
+        if stock_name.lower() in ["다", "전부", "전체"]:
+            portfolio = user.get("portfolio", {})
+            if not portfolio:
+                await ctx.send("판매할 주식이 없습니다.")
+                return
+        
+            total_revenue = 0
+            messages = []
+            # 모든 종목에 대해 매도 처리
+            for sid, holding in portfolio.items():
+                stock = self.db.stocks.find_one({"_id": sid})
+                if not stock:
+                    continue
+                current_amount = holding.get("amount", 0)
+                if current_amount <= 0:
+                    continue
+                revenue = stock["price"] * current_amount
+                total_revenue += revenue
+                messages.append(f"{stock['name']} 주식 {current_amount}주 매도하여 {revenue:,}원 획득")
+            new_money = user["money"] + total_revenue
+        
+            # 포트폴리오 전체 삭제 후 현금 업데이트
+            self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": {}}})
+            await ctx.send(
+                f"{ctx.author.mention}님, 보유한 모든 주식을 매도하였습니다.\n"
+                f"총 {total_revenue:,}원을 획득하였습니다. (현재 잔액: {new_money:,}원)\n" +
+                "\n".join(messages)
+            )
+            return
+
+        # 특정 종목 매도 처리 (두 번째 인자 amount가 필요)
+        if amount is None:
+            await ctx.send("판매할 주식 수량을 입력해주세요. (예: `#매도 종목명 10` 또는 `#매도 종목명 다`)")
             return
 
         stock = self.db.stocks.find_one({"name": stock_name})
@@ -767,7 +805,9 @@ class StockMarket(commands.Cog):
             portfolio.pop(stock["_id"])
 
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
-        await ctx.send(f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount:,.0f}주 판매하여 {revenue:,}원을 획득하였습니다.")
+        await ctx.send(
+            f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount:,.0f}주 판매하여 {revenue:,}원을 획득하였습니다. (현재 잔액: {new_money:,}원)"
+        )
 
     @commands.command(name="프로필", aliases=["보관함", "자산", "자본"])
     async def profile(self, ctx):

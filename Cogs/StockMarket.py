@@ -1444,8 +1444,8 @@ class StockMarket(commands.Cog):
         if user["money"] < deposit_amount:
             await ctx.send("현금 잔액이 부족합니다.")
             return
-        new_money = user["money"] - deposit_amount
-        new_bank = user.get("bank", 0) + deposit_amount
+        new_money = int(user["money"] - deposit_amount)
+        new_bank = int(user.get("bank", 0) + deposit_amount)
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "bank": new_bank}})
         await ctx.send(f"{ctx.author.mention}님, {deposit_amount:,}원이 예금되었습니다. (은행 잔액: {new_bank:,}원, 현금: {new_money:,}원)")
 

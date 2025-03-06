@@ -131,8 +131,7 @@ class Lotto(commands.Cog):
     @commands.command(name="복권구매")
     async def buy_lotto(self, ctx, ticket_arg: str):
         """
-        #복권구매 [숫자 또는 다/전부/올인] : 1장당 5,000원, 최대 30장까지 구매 가능
-        ※ 복권은 주식 돈을 사용하지만, 복권 명령어는 언제든 사용할 수 있습니다.
+        #복권구매 [숫자 또는 다/전부/올인] : 1장당 10,000원, 최대 30장까지 구매 가능
         """
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
@@ -156,7 +155,7 @@ class Lotto(commands.Cog):
 
         if ticket_arg in special_keywords:
             available_money = user.get("money", 0)
-            max_affordable = available_money // 5000
+            max_affordable = available_money // 10000
             remaining_limit = 30 - already_bought
             ticket_count = min(max_affordable, remaining_limit)
             if ticket_count <= 0:
@@ -179,7 +178,7 @@ class Lotto(commands.Cog):
                 await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니다!")
                 return
 
-        cost = ticket_count * 5000
+        cost = ticket_count * 10000
         if user.get("money", 0) < cost:
             await ctx.send("❌ 보유한 현금이 부족합니다!")
             return

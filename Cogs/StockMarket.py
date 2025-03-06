@@ -645,13 +645,6 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="주식구매", aliases=["매수"])
     async def buy_stock(self, ctx, stock_name: str = None, amount: str = None):
-        """
-        #주식구매 [종목명] [수량 또는 all/전부/올인/다/풀매수]:
-        - 지정 종목 구매는 기존 로직을 따릅니다.
-        - 만약 첫 번째 인자로 "다" (또는 동의어)만 입력하면,
-        남은 자금 내에서 매 구매마다 랜덤하게 한 종목을 선택하고,
-        해당 종목을 랜덤한 수량(1주 이상, 구매 가능한 최대 수량 내)만큼 구매합니다.
-        """
         special_tokens = ["all", "전부", "올인", "다", "풀매수"]
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
@@ -661,71 +654,76 @@ class StockMarket(commands.Cog):
 
         # 랜덤 구매 분기: 첫 번째 인자가 special token이면 두 번째 인자는 무시
         if stock_name is not None and stock_name.lower() in special_tokens:
-            current_money = user.get("money", 0)
-            # 거래 가능한 모든 상장 주식 조회
-            stocks_list = list(self.db.stocks.find({"listed": True}))
-            if not stocks_list:
-                await ctx.send("구매 가능한 주식이 없습니다.")
-                return
+            try:
+                current_money = user.get("money", 0)
+                # 거래 가능한 모든 상장 주식 조회
+                stocks_list = list(self.db.stocks.find({"listed": True}))
+                if not stocks_list:
+                    await ctx.send("구매 가능한 주식이 없습니다.")
+                    return
 
-            # 최소 주가 확인
-            min_price = min(stock["price"] for stock in stocks_list)
-            if current_money < min_price:
-                await ctx.send("잔액이 부족하여 어떤 주식도 구매할 수 없습니다.")
-                return
+                # 최소 주가 확인
+                min_price = min(stock["price"] for stock in stocks_list)
+                if current_money < min_price:
+                    await ctx.send("잔액이 부족하여 어떤 주식도 구매할 수 없습니다.")
+                    return
 
-            purchases = {}  # {stock_id: 총 구매 주식 수}
-            # 잔액으로 최소 1주라도 살 수 있는 경우 계속 진행
-            while True:
-                affordable_stocks = [s for s in stocks_list if s["price"] <= current_money]
-                if not affordable_stocks:
-                    break
-                # 랜덤하게 주식 선택
-                chosen_stock = random.choice(affordable_stocks)
-                price = chosen_stock["price"]
-                max_possible = current_money // price
-                if max_possible < 1:
-                    break
-                # 구매할 수량을 1주 이상 max_possible 주 사이에서 랜덤 결정
-                random_quantity = random.randint(1, max_possible)
-                cost = price * random_quantity
-                current_money -= cost
-                sid = chosen_stock["_id"]
-                purchases[sid] = purchases.get(sid, 0) + random_quantity
+                purchases = {}  # {stock_id: 총 구매 주식 수}
+                # 잔액으로 최소 1주라도 살 수 있는 경우 계속 진행
+                while True:
+                    affordable_stocks = [s for s in stocks_list if s["price"] <= current_money]
+                    if not affordable_stocks:
+                        break
+                    # 랜덤하게 주식 선택
+                    chosen_stock = random.choice(affordable_stocks)
+                    price = chosen_stock["price"]
+                    max_possible = current_money // price
+                    if max_possible < 1:
+                        break
+                    # 구매할 수량을 1주 이상 max_possible 주 사이에서 랜덤 결정
+                    random_quantity = random.randint(1, max_possible)
+                    cost = price * random_quantity
+                    current_money -= cost
+                    sid = chosen_stock["_id"]
+                    purchases[sid] = purchases.get(sid, 0) + random_quantity
 
-            # 유저 포트폴리오 업데이트
-            portfolio = user.get("portfolio", {})
-            for sid, shares in purchases.items():
-                stock = self.db.stocks.find_one({"_id": sid})
-                if not stock:
-                    continue
-                cost = stock["price"] * shares
-                if sid in portfolio:
-                    portfolio[sid]["amount"] += shares
-                    portfolio[sid]["total_cost"] += cost
-                else:
-                    portfolio[sid] = {"amount": shares, "total_cost": cost}
-            self.db.users.update_one({"_id": user_id}, {"$set": {"money": current_money, "portfolio": portfolio}})
+                # 유저 포트폴리오 업데이트
+                portfolio = user.get("portfolio", {})
+                for sid, shares in purchases.items():
+                    stock = self.db.stocks.find_one({"_id": sid})
+                    if not stock:
+                        continue
+                    cost = stock["price"] * shares
+                    if sid in portfolio:
+                        portfolio[sid]["amount"] += shares
+                        portfolio[sid]["total_cost"] += cost
+                    else:
+                        portfolio[sid] = {"amount": shares, "total_cost": cost}
+                self.db.users.update_one({"_id": user_id}, {"$set": {"money": current_money, "portfolio": portfolio}})
 
-            # 결과 메시지 작성: 각 주식의 구매 내역과 최종 잔액 표시
-            msg_lines = []
-            for sid, shares in purchases.items():
-                stock = self.db.stocks.find_one({"_id": sid})
-                if stock:
-                    total_cost = stock["price"] * shares
-                    msg_lines.append(f"- {stock['name']} 주식 {shares:,.0f}주 구매 (총 {total_cost:,.0f}원)")
-            response = (
-                f"{ctx.author.mention}님, 랜덤 매수 명령으로 아래와 같이 구매가 완료되었습니다.\n"
-                + "\n".join(msg_lines)
-                + f"\n남은 잔액: {current_money:,.0f}원"
-            )
-            await ctx.send(response)
+                # 결과 메시지 작성: 각 주식의 구매 내역과 최종 잔액 표시
+                msg_lines = []
+                for sid, shares in purchases.items():
+                    stock = self.db.stocks.find_one({"_id": sid})
+                    if stock:
+                        total_cost = stock["price"] * shares
+                        msg_lines.append(f"- {stock['name']} 주식 {shares:,.0f}주 구매 (총 {total_cost:,.0f}원)")
+                response = (
+                    f"{ctx.author.mention}님, 랜덤 매수 명령으로 아래와 같이 구매가 완료되었습니다.\n"
+                    + "\n".join(msg_lines)
+                    + f"\n남은 잔액: {current_money:,.0f}원"
+                )
+                await ctx.send(response)
+            except Exception as e:
+                await ctx.send(f"랜덤 매수 중 오류가 발생했습니다. 오류 코드: {e}")
             return
 
-        # 지정 종목 구매 처리
+        # 지정 종목 구매 처리 (기존 코드 계속)
         if stock_name is None or amount is None:
             await ctx.send("구매할 종목명과 수량을 입력해주세요. 예: `#주식구매 썬더타이어 10`")
             return
+        # ... 이하 지정 종목 구매 로직 ...
+
 
         stock = self.db.stocks.find_one({"name": stock_name})
         if not stock:
@@ -1623,7 +1621,7 @@ class StockMarket(commands.Cog):
             await ctx.send(f"대출 이자 업데이트 오류: {e}")
             return
 
-        max_loan = 5000000  # 최대 대출 한도
+        max_loan = 3000000  # 최대 대출 한도
 
         # 4. 입력값 처리
         try:

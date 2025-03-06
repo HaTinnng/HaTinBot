@@ -740,14 +740,14 @@ class StockMarket(commands.Cog):
                     continue
                 revenue = stock["price"] * current_amount
                 total_revenue += revenue
-                messages.append(f"- {stock['name']} 주식 {current_amount}주 매도하여 {revenue:,}원 획득")
+                messages.append(f"- {stock['name']} 주식 {current_amount:,.0f}주 매도하여 {revenue:,}원 획득")
             new_money = user["money"] + total_revenue
         
             # 포트폴리오 전체 삭제 후 현금 업데이트
             self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": {}}})
             await ctx.send(
                 f"{ctx.author.mention}님, 보유한 모든 주식을 매도하였습니다.\n"
-                f"총 {total_revenue:,}원을 획득하였습니다. (현재 잔액: {new_money:,.0f}원)\n" +
+                f"총 {total_revenue:,.0f}원을 획득하였습니다. (현재 잔액: {new_money:,.0f}원)\n" +
                 "\n".join(messages)
             )
             return

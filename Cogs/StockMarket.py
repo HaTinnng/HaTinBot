@@ -1044,7 +1044,7 @@ class StockMarket(commands.Cog):
             plt.annotate(
                 f"{price:,}",
                 xy=(i, price),
-                xytext=(-10, 0),
+                xytext=(10, 0),
                 textcoords="offset points",
                 ha="left",
                 va="center",

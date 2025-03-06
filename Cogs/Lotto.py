@@ -155,6 +155,9 @@ class Lotto(commands.Cog):
 
         if ticket_arg in special_keywords:
             available_money = user.get("money", 0)
+            if available_money < 10000:
+                await ctx.send("❌ 보유한 현금이 10,000원 미만입니다. 복권을 구매할 수 없습니다.")
+                return
             max_affordable = available_money // 10000
             remaining_limit = 30 - already_bought
             ticket_count = min(max_affordable, remaining_limit)
@@ -169,18 +172,18 @@ class Lotto(commands.Cog):
                 return
 
             if ticket_count <= 0:
-                await ctx.send("❌ 최소 1장 이상 구매해야 합니다!")
+                await ctx.send("❌ 최소 1장 이상 구매해야 합니다.")
                 return
             if ticket_count > 30:
-                await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니다!")
+                await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니다.")
                 return
             if already_bought + ticket_count > 30:
-                await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니다!")
+                await ctx.send("❌ 한 주에 최대 30장까지만 구매할 수 있습니.")
                 return
 
         cost = ticket_count * 10000
         if user.get("money", 0) < cost:
-            await ctx.send("❌ 보유한 현금이 부족합니다!")
+            await ctx.send("❌ 보유한 현금이 부족합니다.")
             return
 
         # 1~45 중 6개 랜덤 선택으로 복권 티켓 생성

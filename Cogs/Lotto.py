@@ -252,51 +252,117 @@ class Lotto(commands.Cog):
         else:
             await ctx.send("🎟 이번 주에 구매한 복권이 없습니다!")
 
+    # 복권결과 명령어는 당첨금 지급 여부와 결과를 확인하기 위한 용도로 남겨두었습니다.
     @commands.command(name="복권결과")
     async def lotto_result(self, ctx):
         """
         #복권결과 : 지난주와 이번주 당첨 번호 확인
-        각 주별로 당첨 번호를 10개씩 나누어 표시합니다.
+        이미 당첨금이 지급된 티켓은 지급 여부와 당첨 금액을 표시합니다.
         """
+        user_id = str(ctx.author.id)
         now = self.get_seoul_time()
         current_week = now.strftime("%Y-%W")
         last_week = (now - timedelta(weeks=1)).strftime("%Y-%W")
 
-        # 지난주 복권 결과
+        messages = []
+        # 지난주 복권 결과 확인
         result_last = self.db.lotto_result.find_one({"_id": last_week})
         if result_last and result_last.get("numbers"):
             numbers = result_last["numbers"]
             result_line = f"📢 당첨 번호: `{' '.join(map(str, numbers))}`"
-            view = PaginationView([result_line], title=f"지난주({last_week}) 복권 결과")
-            await ctx.send(content=view.get_page_content(), view=view)
+            user_lotto_last = self.db.lotto.find_one({"_id": f"{user_id}_{last_week}"})
+            if user_lotto_last:
+                if user_lotto_last.get("paid", False):
+                    messages.append("지난주 복권 당첨금은 지급되었습니다.")
+                else:
+                    messages.append("지난주 복권 당첨금이 아직 지급되지 않았습니다.")
+            else:
+                messages.append("지난주 복권 구매 기록이 없습니다.")
+            messages.insert(0, result_line)
         else:
-            await ctx.send("📢 지난 주 복권 당첨 번호가 아직 추첨되지 않았습니다!")
+            messages.append("📢 지난 주 복권 당첨 번호가 아직 추첨되지 않았습니다!")
 
-        # 이번주 복권 결과
+        # 이번주 복권 결과 확인
         result_current = self.db.lotto_result.find_one({"_id": current_week})
         if result_current and result_current.get("numbers"):
             numbers = result_current["numbers"]
             result_line = f"📢 당첨 번호: `{' '.join(map(str, numbers))}`"
-            view = PaginationView([result_line], title=f"이번주({current_week}) 복권 결과")
-            await ctx.send(content=view.get_page_content(), view=view)
+            user_lotto_current = self.db.lotto.find_one({"_id": f"{user_id}_{current_week}"})
+            if user_lotto_current:
+                if user_lotto_current.get("paid", False):
+                    messages.append("이번주 복권 당첨금은 지급되었습니다.")
+                else:
+                    messages.append("이번주 복권 당첨금이 아직 지급되지 않았습니다.")
+            else:
+                messages.append("이번주 복권 구매 기록이 없습니다.")
+            messages.insert(0, result_line)
         else:
-            await ctx.send("📢 이번 주 복권 당첨 번호가 아직 추첨되지 않았습니다!")
+            messages.append("📢 이번 주 복권 당첨 번호가 아직 추첨되지 않았습니다!")
+
+        view = PaginationView(messages, title="복권 결과 확인")
+        await ctx.send(content=view.get_page_content(), view=view)
 
     @tasks.loop(hours=1)
     async def lotto_draw_task(self):
-        """매주 일요일 21:00 자동 복권 추첨"""
+        """매주 일요일 21:00 자동 복권 추첨 및 당첨금 자동 지급"""
         now = self.get_seoul_time()
         if now.weekday() == 6 and now.hour == 21:
             current_week = now.strftime("%Y-%W")
+            # 당첨 번호 생성
             winning_numbers = sorted(random.sample(range(1, 46), 6))
             self.db.lotto_result.update_one(
                 {"_id": current_week},
                 {"$set": {"numbers": winning_numbers}},
                 upsert=True
             )
-            channel = self.bot.get_channel(YOUR_CHANNEL_ID)  # 결과 발표 채널 ID 설정
-            if channel:
-                await channel.send(f"🎉 이번 주 복권 당첨 번호: `{' '.join(map(str, winning_numbers))}`")
+            # 해당 주의 모든 복권 구매 기록 중 아직 지급되지 않은 문서를 조회
+            docs = list(self.db.lotto.find({"_id": {"$regex": f"_{current_week}$"}, "paid": {"$ne": True}}))
+            for doc in docs:
+                user_id, _ = doc["_id"].split("_")
+                tickets = doc.get("tickets", [])
+                total_prize = 0
+                prize_details = []  # 각 티켓별 당첨 내역 기록
+                winning_count = 0  # 당첨 티켓 개수
+
+                # 각 티켓별 맞춘 번호 개수에 따라 당첨금 산정
+                for ticket in tickets:
+                    match_count = len(set(ticket) & set(winning_numbers))
+                    if match_count == 6:
+                        prize = 100000000
+                    elif match_count == 5:
+                        prize = 20000000
+                    elif match_count == 4:
+                        prize = 5000000
+                    elif match_count == 3:
+                        prize = 50000
+                    else:
+                        prize = 0
+                    total_prize += prize
+                    if prize > 0:
+                        winning_count += 1
+                    prize_details.append(f"티켓 {ticket} : {match_count}개 맞음 -> {prize:,}원")
+
+                try:
+                    user_obj = await self.bot.fetch_user(int(user_id))
+                    if total_prize > 0:
+                        # 사용자 잔액 업데이트
+                        self.db.users.update_one({"_id": user_id}, {"$inc": {"money": total_prize}})
+                        # 개인 DM으로 당첨 내역 전송 (당첨 티켓 개수와 총 지급 금액 포함)
+                        await user_obj.send(
+                            f"🎊 이번 주 복권 당첨 결과:\n당첨 번호: `{' '.join(map(str, winning_numbers))}`\n"
+                            + "\n".join(prize_details)
+                            + f"\n\n당첨 티켓 수: 복권 {winning_count}개가 당첨되었습니다.\n총 {total_prize:,}원이 지급되었습니다."
+                        )
+                    else:
+                        await user_obj.send(
+                            f"😢 이번 주 복권 당첨 결과:\n당첨 번호: `{' '.join(map(str, winning_numbers))}`\n"
+                            "당첨 내역이 없습니다."
+                        )
+                except Exception as e:
+                    print(f"Error sending DM to user {user_id}: {e}")
+
+                # 지급 완료 후 중복 지급 방지 처리
+                self.db.lotto.update_one({"_id": doc["_id"]}, {"$set": {"paid": True}})
 
     @lotto_draw_task.before_loop
     async def before_lotto_draw(self):
@@ -312,9 +378,6 @@ class Lotto(commands.Cog):
                 self.db.lotto.delete_many({})
                 self.db.lotto_result.delete_many({})
                 self.last_reset_month = now.month
-                channel = self.bot.get_channel(YOUR_CHANNEL_ID)  # 결과 발표 채널 ID 설정
-                if channel:
-                    await channel.send("📢 복권 데이터가 초기화되었습니다. 새로운 시즌을 시작합니다!")
 
 async def setup(bot):
     await bot.add_cog(Lotto(bot))

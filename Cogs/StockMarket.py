@@ -1046,7 +1046,7 @@ class StockMarket(commands.Cog):
                 xy=(i, price),
                 xytext=(-10, 0),
                 textcoords="offset points",
-                ha="right",
+                ha="left",
                 va="center",
                 fontsize=10
             )

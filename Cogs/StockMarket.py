@@ -1623,7 +1623,7 @@ class StockMarket(commands.Cog):
             await ctx.send(f"대출 이자 업데이트 오류: {e}")
             return
 
-        max_loan = 3000000  # 최대 대출 한도
+        max_loan = 5000000  # 최대 대출 한도
 
         # 4. 입력값 처리
         try:

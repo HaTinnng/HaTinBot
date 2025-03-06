@@ -652,7 +652,7 @@ class StockMarket(commands.Cog):
             await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
             return
 
-        # 랜덤 구매 분기: 첫 번째 인자가 special token이면 두 번째 인자는 무시
+        # 랜덤 구매 분기: 첫 번째 인자가 특수 토큰이면 두 번째 인자는 무시
         if stock_name is not None and stock_name.lower() in special_tokens:
             try:
                 current_money = user.get("money", 0)
@@ -677,7 +677,7 @@ class StockMarket(commands.Cog):
                     # 랜덤하게 주식 선택
                     chosen_stock = random.choice(affordable_stocks)
                     price = chosen_stock["price"]
-                    max_possible = current_money // price
+                    max_possible = int(current_money // price)  # 정수형 변환
                     if max_possible < 1:
                         break
                     # 구매할 수량을 1주 이상 max_possible 주 사이에서 랜덤 결정
@@ -718,12 +718,10 @@ class StockMarket(commands.Cog):
                 await ctx.send(f"랜덤 매수 중 오류가 발생했습니다. 오류 코드: {e}")
             return
 
-        # 지정 종목 구매 처리 (기존 코드 계속)
+        # 지정 종목 구매 처리
         if stock_name is None or amount is None:
             await ctx.send("구매할 종목명과 수량을 입력해주세요. 예: `#주식구매 썬더타이어 10`")
             return
-        # ... 이하 지정 종목 구매 로직 ...
-
 
         stock = self.db.stocks.find_one({"name": stock_name})
         if not stock:

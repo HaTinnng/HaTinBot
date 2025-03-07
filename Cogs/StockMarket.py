@@ -804,7 +804,7 @@ class StockMarket(commands.Cog):
                     continue
                 revenue = stock["price"] * current_amount
                 total_revenue += revenue
-                messages.append(f"- {stock['name']} 주식 {current_amount:,.0f}주 매도하여 {revenue:,}원 획득")
+                messages.append(f"- {stock['name']} 주식 {current_amount:,.0f}주 매도하여 {revenue:,.0f}원 획득")
             new_money = user["money"] + total_revenue
         
             # 포트폴리오 전체 삭제 후 현금 업데이트

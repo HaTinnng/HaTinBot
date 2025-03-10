@@ -1623,7 +1623,7 @@ class StockMarket(commands.Cog):
 
         # 4. 입력값 처리
         try:
-            if amount.lower() in ["다", "all", "전부", "풀대출", "올인인"]:
+            if amount.lower() in ["다", "all", "전부", "풀대출", "올인"]:
                 loan_amount = max_loan - current_loan
                 if loan_amount <= 0:
                     await ctx.send("이미 최대 대출 한도에 도달했습니다.")
@@ -1657,7 +1657,7 @@ class StockMarket(commands.Cog):
 
         # 6. 성공 메시지 전송
         try:
-            await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원의 대출을 받았습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
+            await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원의 대출을 받았습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,.0f}원)")
         except Exception as e:
             await ctx.send(f"메시지 전송 오류: {e}")
 

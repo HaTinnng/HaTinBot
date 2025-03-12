@@ -178,11 +178,11 @@ class Roulette(commands.Cog):
         final_embed.add_field(name="🎲 룰렛 결과", value=f"`| {symbols[0]} | {symbols[1]} | {symbols[2]} |`", inline=False)
 
         if payout_multiplier > 0:
-            final_embed.add_field(name="🎉 당첨!", value=f"💰 {payout:,}원 획득! (배팅금 {bet_amount:,}원 × {payout_multiplier}배)", inline=False)
+            final_embed.add_field(name="🎉 당첨!", value=f"💰 {payout:,.0f}원 획득! (배팅금 {bet_amount:,.0f}원 × {payout_multiplier}배)", inline=False)
         else:
-            final_embed.add_field(name="💸 꽝!", value=f"😭 {bet_amount:,}원을 잃었습니다!", inline=False)
+            final_embed.add_field(name="💸 꽝!", value=f"😭 {bet_amount:,.0f}원을 잃었습니다!", inline=False)
 
-        final_embed.add_field(name="💰 현재 잔액", value=f"{new_balance:,}원", inline=False)
+        final_embed.add_field(name="💰 현재 잔액", value=f"{new_balance:,.0f}원", inline=False)
         await spin_message.edit(embed=final_embed)
 
 async def setup(bot):

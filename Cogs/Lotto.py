@@ -332,7 +332,7 @@ class Lotto(commands.Cog):
                     if match_count == 6:
                         prize = 1000000000
                     elif match_count == 5:
-                        prize = 20000000
+                        prize = 50000000
                     elif match_count == 4:
                         prize = 5000000
                     elif match_count == 3:

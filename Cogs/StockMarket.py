@@ -926,57 +926,69 @@ class StockMarket(commands.Cog):
         )
         await ctx.send(msg)
 
-    @commands.command(name="랭킹", aliases=["순위"])
-    async def ranking_css(self, ctx):
+    @commands.command(name="랭킹")
+    async def ranking_ansi(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금 + 예금 + 주식 평가액 - 대출금)을 기준으로 순위를 매겨,
-        CSS 문법을 활용한 코드 블록으로 출력합니다.
+        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨,
+        ANSI 이스케이프 시퀀스를 사용해 Discord 메시지 내에서 색이 채워진 텍스트를 보여줍니다.
         
-        - 1등은 금색 채움 (gold)
-        - 2등~3등은 노란색 채움 (yellow)
-        - 4등~5등은 초록색 채움 (green)
-        - 나머지는 기본 흰색
+        주의:
+        - PC용 Discord 클라이언트에서만 정상적으로 보일 수 있습니다.
+        - 모바일/웹 클라이언트에서는 ANSI 코드가 적용되지 않을 수 있습니다.
         """
+        # 1. DB에서 유저들의 자산을 계산하여 리스트에 저장
         ranking_list = []
-        # 유저 데이터 조회 (주식 게임 DB의 users 컬렉션)
         for user in self.db.users.find({}):
-            total = user.get("money", DEFAULT_MONEY) + user.get("bank", 0)
+            user_id = user["_id"]
+            username = user.get("username", "알 수 없음")
+            money = user.get("money", DEFAULT_MONEY)
+            bank = user.get("bank", 0)
             portfolio = user.get("portfolio", {})
+            loan_info = user.get("loan", {})
+
+            # 기본 자산(현금 + 은행)
+            total_assets = money + bank
+
+            # 주식 평가액 추가
             for sid, holding in portfolio.items():
                 stock = self.db.stocks.find_one({"_id": sid})
                 if stock:
-                    total += stock["price"] * holding.get("amount", 0)
-            # 대출금이 있을 경우 차감
-            loan_info = user.get("loan", {})
-            if loan_info and isinstance(loan_info, dict):
-                total -= loan_info.get("amount", 0)
-            ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
-        
+                    total_assets += stock["price"] * holding.get("amount", 0)
+
+            # 대출금 차감
+            if isinstance(loan_info, dict):
+                total_assets -= loan_info.get("amount", 0)
+
+            ranking_list.append((username, total_assets))
+
+        # 2. 자산을 기준으로 내림차순 정렬 (상위 10명만 표시)
         ranking_list.sort(key=lambda x: x[1], reverse=True)
-        
-        css_lines = []
-        css_lines.append("/* 랭킹 TOP 10 */")
-        # 각 순위별 CSS 스타일 설정
-        for i, (uid, total, username) in enumerate(ranking_list[:10], start=1):
-            if i == 1:
-                css_class = "rank-1"
-                style = "color: gold; background-color: gold;"
-            elif i in [2, 3]:
-                css_class = f"rank-{i}"
-                style = "color: yellow; background-color: yellow;"
-            elif i in [4, 5]:
-                css_class = f"rank-{i}"
-                style = "color: green; background-color: green;"
+        top_10 = ranking_list[:10]
+
+        # 3. ANSI 코드 문자열 생성
+        lines = []
+        lines.append("---- 랭킹 TOP 10 ----\n")
+        for idx, (username, total) in enumerate(top_10, start=1):
+            # rank_index: 1등, 2~3등, 4~5등, 그 외
+            if idx == 1:
+                # 1등: 배경 노랑 + 글자 검정
+                # (금색은 ANSI 표준에 없어 노랑으로 대체)
+                line = f"\u001b[30;43m{idx}. {username} : {total:,}원\u001b[0m"
+            elif idx in [2, 3]:
+                # 2~3등: 배경 노랑 + 글자 검정
+                line = f"\u001b[30;43m{idx}. {username} : {total:,}원\u001b[0m"
+            elif idx in [4, 5]:
+                # 4~5등: 배경 초록 + 글자 검정
+                line = f"\u001b[30;42m{idx}. {username} : {total:,}원\u001b[0m"
             else:
-                css_class = f"rank-{i}"
-                style = "color: white;"
-            css_lines.append(f".{css_class}::before {{ {style} }}")
-            css_lines.append(f".{css_class}::before {{ content: \"{i}. {username} : {total:,}원\"; }}")
-        
-        css_text = "\n".join(css_lines)
-        message = f"```css\n{css_text}\n```"
-        await ctx.send(message)
+                # 나머지: 배경 회색(47) + 글자 검정
+                line = f"\u001b[30;47m{idx}. {username} : {total:,}원\u001b[0m"
+            lines.append(line)
+
+        # 4. 코드 블록에 담아 전송 (```ansi)
+        ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
+        await ctx.send(ansi_content)
 
     @commands.command(name="시즌")
     async def season_info(self, ctx):

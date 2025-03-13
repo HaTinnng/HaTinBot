@@ -877,7 +877,7 @@ class StockMarket(commands.Cog):
     async def profile(self, ctx):
         """
         #프로필:
-        자신의 현금, 은행 예금, 보유 주식, 대출 금액 등 전체 자산 정보를 출력합니다.
+        자신의 현금, 은행 예금, 보유 주식, 대출 금액 등 전체 자산 정보를 출력합니다다
         """
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
@@ -911,15 +911,16 @@ class StockMarket(commands.Cog):
 
         # ANSI 이스케이프 시퀀스를 활용하여 출력할 메시지 구성
         lines = []
-        # 헤더: 배경색 ANSI 코드 (예: 48;5;27: 파란색 배경, 1;37: 볼드 흰색 글씨)
         header = f"\u001b[1;37;48;5;27m {username}님의 프로필 \u001b[0m"
         lines.append(header)
         lines.append("")
-        lines.append(f"현금 잔액       : {cash:,.0f}원")
-        lines.append(f"은행 예금       : {bank:,.0f}원")
-        lines.append(f"대출 금액       : {loan_amount:,.0f}원")
-        lines.append(f"보유 주식 총액  : {total_stock_value:,.0f}원")
-        lines.append(f"전체 자산       : {total_assets:,.0f}원")
+
+        lines.append(f"{'현금 잔액':<15} : {cash:,.0f}원")
+        lines.append(f"{'은행 예금':<15} : {bank:,.0f}원")
+        lines.append(f"{'대출 금액':<15} : {loan_amount:,.0f}원")
+        lines.append(f"{'보유 주식 총액':<15} : {total_stock_value:,.0f}원")
+        lines.append(f"{'전체 자산':<15} : {total_assets:,.0f}원")
+
         lines.append("")
         lines.append("보유 주식:")
         lines.append(portfolio_str)

@@ -930,7 +930,12 @@ class StockMarket(commands.Cog):
     async def ranking_ansi(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨 출력
+        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨,
+        1~3등만 밝은 초록색 배경(16컬러 확장: \u001b[102m)으로 표시하고,
+        나머지 등수는 색상 없이 출력합니다.
+        
+        금액은 소수점 없이(.0f) 표시됩니다.
+        (PC용 Discord 클라이언트에서만 ANSI 색상 코드가 제대로 표시될 수 있습니다.)
         """
         # 1. 유저 자산 계산
         ranking_list = []
@@ -957,25 +962,25 @@ class StockMarket(commands.Cog):
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         top_10 = ranking_list[:10]
 
-        # 3. ANSI 이스케이프 시퀀스로 배경색 적용 (1~3등만 밝은 초록색)
+        # 3. ANSI 이스케이프 시퀀스로 (1~3등) 밝은 초록색 배경만 적용
         lines = []
         lines.append("---- 랭킹 TOP 10 ----\n")
         for idx, (username, total) in enumerate(top_10, start=1):
             line_text = f"{idx}. {username} : {total:,.0f}원"
             
             if 1 <= idx <= 3:
-                # 1~3등: 밝은 초록색 배경 (ANSI 256 컬러 코드 46)
-                line = f"\u001b[48;5;46m{line_text}\u001b[0m"
+                # 밝은 초록색 배경 (16컬러 확장, ANSI code 102)
+                line = f"\u001b[102m{line_text}\u001b[0m"
             else:
-                # 나머지 등수는 색상 없음
+                # 그 외는 색상 없이 출력
                 line = line_text
-            
+
             lines.append(line)
 
-        # 4. ANSI 코드 블록으로 감싸 전송
+        # 4. 코드 블록(ansi)으로 감싸 전송
         ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
         await ctx.send(ansi_content)
-
+        
     @commands.command(name="시즌")
     async def season_info(self, ctx):
         """

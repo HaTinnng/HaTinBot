@@ -877,9 +877,7 @@ class StockMarket(commands.Cog):
     async def profile(self, ctx):
         """
         #프로필:
-        자신의 현금, 은행 예금, 각 종목별 보유 주식 수량, 해당 종목의 현재 평가액 및 평균 구매가(구매가 정보)를 포함한 전체 자산과
-        대출 금액을 보여줍니다.
-        게임 참가 시 입력한 이름이 표시됩니다.
+        자신의 현금, 은행 예금, 보유 주식, 대출 금액 등 전체 자산 정보를 출력합니다.
         """
         user_id = str(ctx.author.id)
         user = self.db.users.find_one({"_id": user_id})
@@ -903,28 +901,34 @@ class StockMarket(commands.Cog):
                 f"{stock.get('name', 'Unknown')}: {amount}주 (현재가: {current_price:,}원, 총액: {stock_value:,}원, 평균구매가: {avg_buy:,}원)"
             )
         portfolio_str = "\n".join(portfolio_lines) if portfolio_lines else "보유 주식 없음"
-    
-        # 현금, 은행 예금, 대출 금액 가져오기
+
         cash = user.get("money", DEFAULT_MONEY)
         bank = user.get("bank", 0)
         loan_amount = user.get("loan", {}).get("amount", 0)
-    
-        # 전체 자산은 현금, 예금, 보유 주식의 합에서 대출 금액을 차감합니다.
         total_assets = cash + bank + total_stock_value - loan_amount
         titles_str = ", ".join(user.get("titles", [])) if user.get("titles", []) else "없음"
         username = user.get("username", ctx.author.display_name)
-    
-        msg = (
-            f"**{username}님의 프로필**\n"
-            f"현금 잔액: {cash:,.0f}원\n"
-            f"은행 예금: {bank:,.0f}원\n"
-            f"대출 금액: {loan_amount:,.0f}원\n"
-            f"보유 주식 총액: {total_stock_value:,.0f}원\n"
-            f"전체 자산 (현금 + 예금 + 주식 - 대출): {total_assets:,.0f}원\n\n"
-            f"보유 주식:\n{portfolio_str}\n"
-            f"칭호: {titles_str}"
-        )
-        await ctx.send(msg)
+
+        # ANSI 이스케이프 시퀀스를 활용하여 출력할 메시지 구성
+        lines = []
+        # 헤더: 배경색 ANSI 코드 (예: 48;5;27: 파란색 배경, 1;37: 볼드 흰색 글씨)
+        header = f"\u001b[1;37;48;5;27m {username}님의 프로필 \u001b[0m"
+        lines.append(header)
+        lines.append("")
+        lines.append(f"현금 잔액       : {cash:,.0f}원")
+        lines.append(f"은행 예금       : {bank:,.0f}원")
+        lines.append(f"대출 금액       : {loan_amount:,.0f}원")
+        lines.append(f"보유 주식 총액  : {total_stock_value:,.0f}원")
+        lines.append(f"전체 자산       : {total_assets:,.0f}원")
+        lines.append("")
+        lines.append("보유 주식:")
+        lines.append(portfolio_str)
+        lines.append("")
+        lines.append("칭호:")
+        lines.append(titles_str)
+
+        ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
+        await ctx.send(ansi_content)
 
     @commands.command(name="랭킹", aliases=["순위"])
     async def ranking_ansi(self, ctx):

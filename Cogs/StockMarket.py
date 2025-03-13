@@ -955,14 +955,17 @@ class StockMarket(commands.Cog):
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         top_10 = ranking_list[:10]
 
-        # 3. ANSI 이스케이프 시퀀스를 사용해 1등에만 효과 적용
+        # 3. ANSI 이스케이프 시퀀스로 텍스트 효과 적용
         lines = []
         lines.append("---- 랭킹 TOP 10 ----")
         for idx, (username, total) in enumerate(top_10, start=1):
             line_text = f"{idx}. {username} : {total:,.0f}원"
             if idx == 1:
-                # 1등: 볼드, 흰색 글씨(37), 금색 배경(ANSI 256 컬러 코드 202)
+                # 1등: 볼드체, 흰색 글씨(37)와 금색 배경(ANSI 256 컬러 코드 202)
                 ansi_line = f"\u001b[1;37;48;5;202m{line_text}\u001b[0m"
+            elif idx in [2, 3]:
+                # 2등과 3등: 볼드체 처리 (글자색, 배경은 기본)
+                ansi_line = f"\u001b[1m{line_text}\u001b[0m"
             else:
                 ansi_line = line_text
             lines.append(ansi_line)

@@ -926,13 +926,11 @@ class StockMarket(commands.Cog):
         )
         await ctx.send(msg)
 
-    @commands.command(name="랭킹")
-    async def ranking_image(self, ctx):
+    @commands.command(name="랭킹", aliases=["순위"])
+    async def ranking_ansi(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매긴 후,
-        상위 3등 항목에만 밝은 초록색 배경을 적용한 랭킹 이미지를 생성하여 전송합니다.
-        금액은 소수점 없이(.0f) 표시됩니다.
+        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨 출력합니다
         """
         # 1. 유저 자산 계산
         ranking_list = []
@@ -952,48 +950,20 @@ class StockMarket(commands.Cog):
                 total_assets -= loan_info.get("amount", 0)
 
             ranking_list.append((username, total_assets))
-        
+
         # 2. 내림차순 정렬 후 상위 10명 추출
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         top_10 = ranking_list[:10]
 
-        # 3. 이미지 생성 설정
-        width = 800
-        item_height = 60
-        height = item_height * len(top_10) + 40  # 위/아래 여백 포함
-        bg_color = (54, 57, 63)  # Discord 다크 테마 배경색 (회색 계열)
-        image = Image.new("RGB", (width, height), color=bg_color)
-        draw = ImageDraw.Draw(image)
-
-        # 폰트 로드 (arial.ttf 파일 경로가 없으면 기본 폰트 사용)
-        try:
-            font = ImageFont.truetype("arial.ttf", 32)
-        except Exception:
-            font = ImageFont.load_default()
-
-        # 상위 3등은 밝은 초록색 배경 (RGB: (144, 238, 144))
-        highlight_color = (144, 238, 144)
-        text_color = (255, 255, 255)
-
-        # 4. 각 랭킹 항목을 이미지에 그리기
+        # 3. ANSI 코드 없이 일반 텍스트만 출력
+        lines = []
+        lines.append("---- 랭킹 TOP 10 ----\n")
         for idx, (username, total) in enumerate(top_10, start=1):
-            text = f"{idx}. {username} : {total:,.0f}원"
-            x = 20
-            y = 20 + (idx - 1) * item_height
+            line_text = f"{idx}. {username} : {total:,.0f}원"
+            lines.append(line_text)
 
-            if 1 <= idx <= 3:
-                # 텍스트 배경을 위해 텍스트 크기 측정 후 사각형 그리기
-                text_width, text_height = draw.textsize(text, font=font)
-                draw.rectangle([x - 5, y - 5, x + text_width + 5, y + text_height + 5], fill=highlight_color)
-            
-            draw.text((x, y), text, font=font, fill=text_color)
-
-        # 5. 이미지를 메모리 버퍼에 저장 후 Discord에 전송
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-        buffer.seek(0)
-        file = discord.File(fp=buffer, filename="ranking.png")
-        await ctx.send("랭킹 결과입니다:", file=file)
+        content = "```ansi\n" + "\n".join(lines) + "\n```"
+        await ctx.send(content)
 
     @commands.command(name="시즌")
     async def season_info(self, ctx):

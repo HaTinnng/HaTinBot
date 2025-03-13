@@ -927,8 +927,11 @@ class StockMarket(commands.Cog):
         await ctx.send(msg)
 
     @commands.command(name="랭킹", aliases=["순위"])
-    async def ranking_css(self, ctx):
-        # 기존 #랭킹 명령어와 유사하게 순위 데이터를 준비합니다.
+    async def ranking(self, ctx):   
+        """
+        #랭킹:
+        전체 유저의 자산(현금+보유 주식 평가액)을 기준으로 상위 10명을 (유저 id와 게임 내 이름 포함) 출력합니다.
+        """
         ranking_list = []
         for user in self.db.users.find({}):
             total = user.get("money", DEFAULT_MONEY) + user.get("bank", 0)
@@ -937,52 +940,17 @@ class StockMarket(commands.Cog):
                 stock = self.db.stocks.find_one({"_id": sid})
                 if stock:
                     total += stock["price"] * holding.get("amount", 0)
+            # 대출금(빚)이 있으면 총 자산에서 차감 (대출 정보가 없거나 None이면 0으로 처리)
             loan_info = user.get("loan")
             if loan_info and isinstance(loan_info, dict):
                 total -= loan_info.get("amount", 0)
             ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
     
         ranking_list.sort(key=lambda x: x[1], reverse=True)
-    
-        # HTML 파일에 CSS를 적용하여 순위 리스트를 생성합니다.
-        html_content = """<!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="UTF-8">
-    <title>랭킹 TOP 10</title>
-    <style>
-    body { font-family: Arial, sans-serif; background-color: #2C2F33; color: #FFFFFF; }
-    h2 { text-align: center; }
-    ol { list-style-type: decimal; padding-left: 20px; }
-    .gold { color: #FFD700; }       /* 1등: 금색 */
-    .yellow { color: #FFFF00; }     /* 2~3등: 노란색 */
-    .green { color: #00FF00; }      /* 4~5등: 초록색 */
-    .normal { color: #FFFFFF; }     /* 나머지: 기본색상 */
-    .ranking-item { margin: 8px 0; font-size: 18px; }
-    </style>
-    </head>
-    <body>
-    <h2>랭킹 TOP 10</h2>
-    <ol>
-    """
+        msg_lines = ["**랭킹 TOP 10**"]
         for idx, (uid, total, uname) in enumerate(ranking_list[:10], start=1):
-            if idx == 1:
-                cls = "gold"
-            elif idx in [2, 3]:
-                cls = "yellow"
-            elif idx in [4, 5]:
-                cls = "green"
-            else:
-                cls = "normal"
-            html_content += f'<li class="ranking-item {cls}">{idx}. {uname} (ID: {uid}) - {total:,}원</li>\n'
-        html_content += """
-    </ol>
-    </body>
-    </html>
-    """
-        # HTML 내용을 Discord 파일로 전송합니다.
-        file = discord.File(io.BytesIO(html_content.encode('utf-8')), filename="ranking.html")
-        await ctx.send("CSS로 꾸민 랭킹 결과입니다:", file=file)
+            msg_lines.append(f"{idx}. {uname} (ID: {uid}) - {total:,.0f}원")
+        await ctx.send("\n".join(msg_lines))
 
     @commands.command(name="시즌")
     async def season_info(self, ctx):

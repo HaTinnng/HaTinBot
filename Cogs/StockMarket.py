@@ -930,13 +930,9 @@ class StockMarket(commands.Cog):
     async def ranking_ansi(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨,
-        1등은 주황색 배경, 2~3등은 노란색 배경, 4~5등은 초록색 배경으로 표시하며,
-        나머지는 기본 텍스트로 출력합니다.
-        금액은 소수점 없이(.0f) 표시됩니다.
-        
-        (PC용 Discord 클라이언트에서 ANSI 색상 코드가 적용됩니다.)
+        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨 출력
         """
+        # 1. 유저 자산 계산
         ranking_list = []
         for user in self.db.users.find({}):
             username = user.get("username", "알 수 없음")
@@ -946,35 +942,37 @@ class StockMarket(commands.Cog):
             loan_info = user.get("loan", {})
 
             total_assets = money + bank
+            # 주식 평가액 합산
             for sid, holding in portfolio.items():
                 stock = self.db.stocks.find_one({"_id": sid})
                 if stock:
                     total_assets += stock["price"] * holding.get("amount", 0)
+            # 대출금 차감
             if isinstance(loan_info, dict):
                 total_assets -= loan_info.get("amount", 0)
+
             ranking_list.append((username, total_assets))
 
+        # 2. 내림차순 정렬 후 상위 10명 추출
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         top_10 = ranking_list[:10]
 
+        # 3. ANSI 이스케이프 시퀀스로 배경색 적용 (1~3등만 밝은 초록색)
         lines = []
-        lines.append("---- 랭킹 TOP 10 ----")
-        # 패딩 길이를 지정하여 배경색이 확실하게 적용되도록 함 (예: 60글자)
+        lines.append("---- 랭킹 TOP 10 ----\n")
         for idx, (username, total) in enumerate(top_10, start=1):
-            line_text = f"{idx}. {username} : {total:,.0f}원".ljust(60)
-            if idx == 1:
-                # 1등: 주황색 배경 (ANSI 256 컬러 코드 202)
-                line = f"\u001b[48;5;202m{line_text}\u001b[0m"
-            elif idx in [2, 3]:
-                # 2~3등: 노란색 배경 (ANSI 256 컬러 코드 226)
-                line = f"\u001b[48;5;226m{line_text}\u001b[0m"
-            elif idx in [4, 5]:
-                # 4~5등: 초록색 배경 (ANSI 256 컬러 코드 46)
+            line_text = f"{idx}. {username} : {total:,.0f}원"
+            
+            if 1 <= idx <= 3:
+                # 1~3등: 밝은 초록색 배경 (ANSI 256 컬러 코드 46)
                 line = f"\u001b[48;5;46m{line_text}\u001b[0m"
             else:
+                # 나머지 등수는 색상 없음
                 line = line_text
+            
             lines.append(line)
 
+        # 4. ANSI 코드 블록으로 감싸 전송
         ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
         await ctx.send(ansi_content)
 

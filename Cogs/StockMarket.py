@@ -915,11 +915,11 @@ class StockMarket(commands.Cog):
         lines.append(header)
         lines.append("")
 
-        lines.append(f"{'현금 잔액':<15} : {cash:,.0f}원")
-        lines.append(f"{'은행 예금':<15} : {bank:,.0f}원")
-        lines.append(f"{'대출 금액':<15} : {loan_amount:,.0f}원")
-        lines.append(f"{'보유 주식 총액':<13} : {total_stock_value:,.0f}원")
-        lines.append(f"{'전체 자산':<15} : {total_assets:,.0f}원")
+        lines.append(f"{'현금 잔액':<13} : {cash:,.0f}원")
+        lines.append(f"{'은행 예금':<13} : {bank:,.0f}원")
+        lines.append(f"{'대출 금액':<13} : {loan_amount:,.0f}원")
+        lines.append(f"{'보유 주식 총액':<12} : {total_stock_value:,.0f}원")
+        lines.append(f"{'전체 자산':<13} : {total_assets:,.0f}원")
 
         lines.append("")
         lines.append("보유 주식:")

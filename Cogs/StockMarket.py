@@ -930,7 +930,11 @@ class StockMarket(commands.Cog):
     async def ranking_ansi(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 표시시,
+        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨,
+        1등은 주황색 배경, 2~3등은 노란색 배경, 4~5등은 초록색 배경, 그 외는 기본 텍스트로 출력합니다.
+        금액은 소수점 없이 표시(.0f).
+        
+        (PC용 Discord 클라이언트에서 ANSI 색상 코드가 적용됩니다.)
         """
         # 1. 유저 자산 계산
         ranking_list = []
@@ -942,43 +946,40 @@ class StockMarket(commands.Cog):
             loan_info = user.get("loan", {})
 
             total_assets = money + bank
-            # 주식 평가액 추가
             for sid, holding in portfolio.items():
                 stock = self.db.stocks.find_one({"_id": sid})
                 if stock:
                     total_assets += stock["price"] * holding.get("amount", 0)
-            # 대출금 차감
             if isinstance(loan_info, dict):
                 total_assets -= loan_info.get("amount", 0)
 
             ranking_list.append((username, total_assets))
 
-        # 2. 내림차순 정렬 후 상위 10명만
+        # 2. 내림차순 정렬 후 상위 10명 추출
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         top_10 = ranking_list[:10]
 
-        # 3. ANSI 코드로 색상 적용
+        # 3. ANSI 이스케이프 시퀀스로 색상 적용
         lines = []
         lines.append("---- 랭킹 TOP 10 ----\n")
         for idx, (username, total) in enumerate(top_10, start=1):
             if idx == 1:
-                # 1위: 주황색 배경 (ANSI 256 컬러 208)
-                line = f"\u001b[30;48;5;208m{idx}. {username} : {total:,.0f}원\u001b[0m"
+                # 1등: 주황색 배경 (ANSI 256 컬러 코드 202)
+                line = f"\u001b[30;48;5;202m{idx}. {username} : {total:,.0f}원\u001b[0m"
             elif idx in [2, 3]:
-                # 2~3위: 노란색 배경
-                line = f"\u001b[30;43m{idx}. {username} : {total:,.0f}원\u001b[0m"
+                # 2~3등: 노란색 배경 (ANSI 256 컬러 코드 226)
+                line = f"\u001b[30;48;5;226m{idx}. {username} : {total:,.0f}원\u001b[0m"
             elif idx in [4, 5]:
-                # 4~5위: 초록색 배경
-                line = f"\u001b[30;42m{idx}. {username} : {total:,.0f}원\u001b[0m"
+                # 4~5등: 초록색 배경 (ANSI 256 컬러 코드 46)
+                line = f"\u001b[30;48;5;46m{idx}. {username} : {total:,.0f}원\u001b[0m"
             else:
-                # 그 외: 색상 없음 (일반 텍스트)
+                # 나머지: 색상 없이 출력
                 line = f"{idx}. {username} : {total:,.0f}원"
             lines.append(line)
 
-        # 4. ANSI 코드 블록(```ansi)으로 감싸 전송
         ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
         await ctx.send(ansi_content)
-
+        
     @commands.command(name="시즌")
     async def season_info(self, ctx):
         """

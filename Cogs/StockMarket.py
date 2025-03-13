@@ -898,7 +898,7 @@ class StockMarket(commands.Cog):
             total_stock_value += stock_value
             avg_buy = round(holding.get("total_cost", 0) / amount, 2) if amount > 0 else 0
             portfolio_lines.append(
-                f"{stock.get('name', 'Unknown')}: {amount}주 (현재가: {current_price:,}원, 총액: {stock_value:,}원, 평균구매가: {avg_buy:,}원)"
+                f"{stock.get('name', 'Unknown')}: {amount:,.0f}주 (현재가: {current_price:,}원, 총액: {stock_value:,.0f}원, 평균구매가: {avg_buy:,}원)"
             )
         portfolio_str = "\n".join(portfolio_lines) if portfolio_lines else "보유 주식 없음"
 

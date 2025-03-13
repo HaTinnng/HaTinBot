@@ -927,12 +927,19 @@ class StockMarket(commands.Cog):
         await ctx.send(msg)
 
     @commands.command(name="랭킹", aliases=["순위"])
-    async def ranking(self, ctx):   
+    async def ranking_css(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금+보유 주식 평가액)을 기준으로 상위 10명을 (유저 id와 게임 내 이름 포함) 출력합니다.
+        전체 유저의 자산(현금 + 예금 + 주식 평가액 - 대출금)을 기준으로 순위를 매겨,
+        CSS 문법을 활용한 코드 블록으로 출력합니다.
+        
+        - 1등은 금색 채움 (gold)
+        - 2등~3등은 노란색 채움 (yellow)
+        - 4등~5등은 초록색 채움 (green)
+        - 나머지는 기본 흰색
         """
         ranking_list = []
+        # 유저 데이터 조회 (주식 게임 DB의 users 컬렉션)
         for user in self.db.users.find({}):
             total = user.get("money", DEFAULT_MONEY) + user.get("bank", 0)
             portfolio = user.get("portfolio", {})
@@ -940,17 +947,36 @@ class StockMarket(commands.Cog):
                 stock = self.db.stocks.find_one({"_id": sid})
                 if stock:
                     total += stock["price"] * holding.get("amount", 0)
-            # 대출금(빚)이 있으면 총 자산에서 차감 (대출 정보가 없거나 None이면 0으로 처리)
-            loan_info = user.get("loan")
+            # 대출금이 있을 경우 차감
+            loan_info = user.get("loan", {})
             if loan_info and isinstance(loan_info, dict):
                 total -= loan_info.get("amount", 0)
             ranking_list.append((user["_id"], total, user.get("username", "알 수 없음")))
-    
+        
         ranking_list.sort(key=lambda x: x[1], reverse=True)
-        msg_lines = ["**랭킹 TOP 10**"]
-        for idx, (uid, total, uname) in enumerate(ranking_list[:10], start=1):
-            msg_lines.append(f"{idx}. {uname} (ID: {uid}) - {total:,.0f}원")
-        await ctx.send("\n".join(msg_lines))
+        
+        css_lines = []
+        css_lines.append("/* 랭킹 TOP 10 */")
+        # 각 순위별 CSS 스타일 설정
+        for i, (uid, total, username) in enumerate(ranking_list[:10], start=1):
+            if i == 1:
+                css_class = "rank-1"
+                style = "color: gold; background-color: gold;"
+            elif i in [2, 3]:
+                css_class = f"rank-{i}"
+                style = "color: yellow; background-color: yellow;"
+            elif i in [4, 5]:
+                css_class = f"rank-{i}"
+                style = "color: green; background-color: green;"
+            else:
+                css_class = f"rank-{i}"
+                style = "color: white;"
+            css_lines.append(f".{css_class}::before {{ {style} }}")
+            css_lines.append(f".{css_class}::before {{ content: \"{i}. {username} : {total:,}원\"; }}")
+        
+        css_text = "\n".join(css_lines)
+        message = f"```css\n{css_text}\n```"
+        await ctx.send(message)
 
     @commands.command(name="시즌")
     async def season_info(self, ctx):

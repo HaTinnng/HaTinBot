@@ -926,11 +926,11 @@ class StockMarket(commands.Cog):
         )
         await ctx.send(msg)
 
-    @commands.command(name="랭킹", aliases=["순위"])
+    @commands.command(name="랭킹")
     async def ranking_ansi(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨 출력합니다
+        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매깁니다.
         """
         # 1. 유저 자산 계산
         ranking_list = []
@@ -955,15 +955,26 @@ class StockMarket(commands.Cog):
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         top_10 = ranking_list[:10]
 
-        # 3. ANSI 코드 없이 일반 텍스트만 출력
+        # 3. ANSI 이스케이프 시퀀스로 글자색 적용
         lines = []
-        lines.append("---- 랭킹 TOP 10 ----\n")
+        lines.append("---- 랭킹 TOP 10 ----")
         for idx, (username, total) in enumerate(top_10, start=1):
             line_text = f"{idx}. {username} : {total:,.0f}원"
-            lines.append(line_text)
+            if idx == 1:
+                # 1등: 금색(볼드 처리) - RGB (255,215,0)
+                line = f"\u001b[1;38;2;255;215;0m{line_text}\u001b[0m"
+            elif idx in [2, 3]:
+                # 2~3등: 라이트 블루 - RGB (173,216,230)
+                line = f"\u001b[38;2;173;216;230m{line_text}\u001b[0m"
+            elif idx in [4, 5]:
+                # 4~5등: yellowish green - RGB (154,205,50)
+                line = f"\u001b[38;2;154;205;50m{line_text}\u001b[0m"
+            else:
+                line = line_text
+            lines.append(line)
 
-        content = "```ansi\n" + "\n".join(lines) + "\n```"
-        await ctx.send(content)
+        ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
+        await ctx.send(ansi_content)
 
     @commands.command(name="시즌")
     async def season_info(self, ctx):

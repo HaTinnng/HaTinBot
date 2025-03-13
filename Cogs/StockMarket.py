@@ -930,9 +930,9 @@ class StockMarket(commands.Cog):
     async def ranking_ansi(self, ctx):
         """
         #랭킹:
-        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매깁니다.
+        전체 유저의 자산(현금 + 예금 + 보유 주식 평가액 - 대출금)을 기준으로 순위를 매겨 출력합니다
         """
-        # 1. 유저 자산 계산
+        # 1. 각 유저의 총 자산을 계산
         ranking_list = []
         for user in self.db.users.find({}):
             username = user.get("username", "알 수 없음")
@@ -948,31 +948,31 @@ class StockMarket(commands.Cog):
                     total_assets += stock["price"] * holding.get("amount", 0)
             if isinstance(loan_info, dict):
                 total_assets -= loan_info.get("amount", 0)
-
             ranking_list.append((username, total_assets))
 
-        # 2. 내림차순 정렬 후 상위 10명 추출
+        # 2. 자산 내림차순 정렬 후 상위 10명 선택
         ranking_list.sort(key=lambda x: x[1], reverse=True)
         top_10 = ranking_list[:10]
 
-        # 3. ANSI 이스케이프 시퀀스로 글자색 적용
+        # 3. ANSI 이스케이프 시퀀스로 각 등수에 원하는 텍스트 색상을 적용
         lines = []
         lines.append("---- 랭킹 TOP 10 ----")
         for idx, (username, total) in enumerate(top_10, start=1):
             line_text = f"{idx}. {username} : {total:,.0f}원"
             if idx == 1:
-                # 1등: 금색(볼드 처리) - RGB (255,215,0)
-                line = f"\u001b[1;38;2;255;215;0m{line_text}\u001b[0m"
+                # 1등: 금색(볼드 처리) → TrueColor: (255,215,0)
+                ansi_line = f"\u001b[1;38;2;255;215;0m{line_text}\u001b[0m"
             elif idx in [2, 3]:
-                # 2~3등: 라이트 블루 - RGB (173,216,230)
-                line = f"\u001b[38;2;173;216;230m{line_text}\u001b[0m"
+                # 2~3등: 라이트 블루 → TrueColor: (173,216,230)
+                ansi_line = f"\u001b[1;38;2;173;216;230m{line_text}\u001b[0m"
             elif idx in [4, 5]:
-                # 4~5등: yellowish green - RGB (154,205,50)
-                line = f"\u001b[38;2;154;205;50m{line_text}\u001b[0m"
+                # 4~5등: yellowish green → TrueColor: (154,205,50)
+                ansi_line = f"\u001b[1;38;2;154;205;50m{line_text}\u001b[0m"
             else:
-                line = line_text
-            lines.append(line)
+                ansi_line = line_text
+            lines.append(ansi_line)
 
+        # 4. ANSI 코드 블록으로 감싸 전송
         ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
         await ctx.send(ansi_content)
 

@@ -244,7 +244,7 @@ class MultiRaceGame(commands.Cog):
         winner_id = winner["user_id"]
         winner_name = winner["username"]
         result_msg = f"🏆 레이스 종료! 우승자: {winner_name} (레인 {participants.index(winner)+1})\n"
-        result_msg += f"총 베팅금액 {total_pool:,}원을 우승자에게 지급합니다."
+        result_msg += f"총 베팅금액 {total_pool:,.0f}원을 우승자에게 지급합니다."
 
         winner_record = self.db.users.find_one({"_id": winner_id})
         if winner_record:

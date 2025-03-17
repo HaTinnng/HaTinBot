@@ -870,7 +870,7 @@ class StockMarket(commands.Cog):
 
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "portfolio": portfolio}})
         await ctx.send(
-            f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount:,.0f}주 판매하여 {revenue:,}원을 획득하였습니다. (현재 잔액: {new_money:,}원)"
+            f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount:,.0f}주 판매하여 {revenue:,.0f}원을 획득하였습니다. (현재 잔액: {new_money:,.0f}원)"
         )
 
     @commands.command(name="프로필", aliases=["보관함", "자산", "자본"])

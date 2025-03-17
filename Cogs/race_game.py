@@ -107,8 +107,8 @@ class RaceGame(commands.Cog):
             updated_cash = new_cash + win_amount
             self.db.users.update_one({"_id": user_id}, {"$set": {"money": updated_cash}})
             result_msg += (
-                f"축하합니다! 베팅에 성공하여 {win_amount:,}원을 획득했습니다.\n"
-                f"현재 현금 잔액: {updated_cash:,}원"
+                f"축하합니다! 베팅에 성공하여 {win_amount:,.0f}원을 획득했습니다.\n"
+                f"현재 현금 잔액: {updated_cash:,.0f}원"
             )
         else:
             result_msg += f"아쉽게도 베팅에 실패하였습니다. 현재 현금 잔액: {new_cash:,}원"

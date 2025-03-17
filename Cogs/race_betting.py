@@ -264,7 +264,7 @@ class RaceBetting(commands.Cog):
             "amount": bet_amount
         }
         self.db.users.update_one({"_id": user_id}, {"$inc": {"money": -bet_amount}})
-        await ctx.send(f"{ctx.author.mention}님이 {selected_horse['name']}에 {bet_amount:,}원을 베팅하였습니다. (남은 잔액: {user_money - bet_amount:,}원)")
+        await ctx.send(f"{ctx.author.mention}님이 {selected_horse['name']}에 {bet_amount:,}원을 베팅하였습니다. (남은 잔액: {user_money - bet_amount:,.0f}원)")
 
     @commands.command(name="내베팅")
     async def my_bet(self, ctx):

@@ -244,6 +244,33 @@ class LoanConfirmView(discord.ui.View):
         self.stop()
         await interaction.response.send_message("대출 진행이 취소되었습니다.", ephemeral=True)
 
+# 주식 소각 명령어 내에 사용할 확인용 View 클래스
+class StockBurnConfirmView(discord.ui.View):
+    def __init__(self, author: discord.Member, stock_name: str, burn_amount: int, timeout=30):
+        super().__init__(timeout=timeout)
+        self.author = author
+        self.stock_name = stock_name
+        self.burn_amount = burn_amount
+        self.value = None  # True: 소각 진행, False: 취소
+
+    @discord.ui.button(label="예", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+            return
+        self.value = True
+        self.stop()
+        await interaction.response.send_message("주식 소각을 진행합니다.", ephemeral=True)
+
+    @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+            return
+        self.value = False
+        self.stop()
+        await interaction.response.send_message("주식 소각이 취소되었습니다.", ephemeral=True)
+
 class StockMarket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -1729,7 +1756,7 @@ class StockMarket(commands.Cog):
         try:
             await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원을 대출받아 현금이 추가되었습니다.\n"
                            f"즉시 적용된 5% 이자 반영으로 대출 상환해야 할 금액은 {effective_loan + current_loan:,}원입니다.\n"
-                        f"(현재 현금: {new_money:,}원)")
+                        f"(현재 현금: {new_money:,.0f}원)")
         except Exception as e:
             await ctx.send(f"[LOAN_006] 메시지 전송 오류: {e}")
 
@@ -1770,7 +1797,7 @@ class StockMarket(commands.Cog):
             "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
         }
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
-        await ctx.send(f"{ctx.author.mention}님, {repay_amount:,}원을 대출 상환하였습니다. (남은 대출 잔액: {new_loan:,}원, 현금: {new_money:,}원)")
+        await ctx.send(f"{ctx.author.mention}님, {repay_amount:,}원을 대출 상환하였습니다. (남은 대출 잔액: {new_loan:,.0f}원, 현금: {new_money:,.0f}원)")
 
     @commands.command(name="다음시즌")
     async def next_season(self, ctx):
@@ -1805,33 +1832,6 @@ class StockMarket(commands.Cog):
             f"시즌 기간: {next_season_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {next_season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"시작까지 남은 시간: {remaining_str}"
         )
-    
-    # 주식 소각 명령어 내에 사용할 확인용 View 클래스
-    class StockBurnConfirmView(discord.ui.View):
-        def __init__(self, author: discord.Member, stock_name: str, burn_amount: int, timeout=30):
-            super().__init__(timeout=timeout)
-            self.author = author
-            self.stock_name = stock_name
-            self.burn_amount = burn_amount
-            self.value = None  # True: 소각 진행, False: 취소
-
-        @discord.ui.button(label="예", style=discord.ButtonStyle.danger)
-        async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author.id:
-                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
-                return
-            self.value = True
-            self.stop()
-            await interaction.response.send_message("주식 소각을 진행합니다.", ephemeral=True)
-
-        @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)
-        async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author.id:
-                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
-                return
-            self.value = False
-            self.stop()
-            await interaction.response.send_message("주식 소각이 취소되었습니다.", ephemeral=True)
 
     # Cog 내에 추가할 #주식소각 명령어 구현 예시
     @commands.command(name="주식소각")

@@ -254,53 +254,62 @@ class Lotto(commands.Cog):
         else:
             await ctx.send("🎟 이번 주에 구매한 복권이 없습니다!")
 
-    # 복권결과 명령어는 당첨금 지급 여부와 결과를 확인하기 위한 용도로 남겨두었습니다.
     @commands.command(name="복권결과")
     async def lotto_result(self, ctx):
         """
-        #복권결과 : 지난주와 이번주 당첨 번호 확인
-        이미 당첨금이 지급된 티켓은 지급 여부와 당첨 금액을 표시합니다.
+        #복권결과 : 지난주와 이번주 당첨 번호 및 당첨 내역 확인
+        당첨된 복권의 티켓 번호, 맞은 개수, 수령금과 총 당첨금을 표시합니다.
         """
         user_id = str(ctx.author.id)
         now = self.get_seoul_time()
-        current_week = now.strftime("%Y-%W")
-        last_week = (now - timedelta(weeks=1)).strftime("%Y-%W")
-
+        # 지난주와 이번주를 각각 처리하기 위한 주차 정보
+        week_info = {
+            "지난주": (now - timedelta(weeks=1)).strftime("%Y-%W"),
+            "이번주": now.strftime("%Y-%W")
+        }
         messages = []
-        # 지난주 복권 결과 확인
-        result_last = self.db.lotto_result.find_one({"_id": last_week})
-        if result_last and result_last.get("numbers"):
-            numbers = result_last["numbers"]
-            result_line = f"📢 당첨 번호: `{' '.join(map(str, numbers))}`"
-            user_lotto_last = self.db.lotto.find_one({"_id": f"{user_id}_{last_week}"})
-            if user_lotto_last:
-                if user_lotto_last.get("paid", False):
-                    messages.append("지난주 복권 당첨금은 지급되었습니다.")
+        for label, week in week_info.items():
+            message = f"**{label}**\n"
+            result = self.db.lotto_result.find_one({"_id": week})
+            if result and result.get("numbers"):
+                winning_numbers = result["numbers"]
+                message += f"📢 당첨 번호: `{' '.join(map(str, winning_numbers))}`\n"
+                user_lotto = self.db.lotto.find_one({"_id": f"{user_id}_{week}"})
+                if user_lotto and user_lotto.get("tickets"):
+                    total_prize = 0
+                    winning_count = 0
+                    details = []
+                    # 사용자가 구매한 티켓들을 순회하며 당첨 내역 계산
+                    for idx, ticket in enumerate(user_lotto["tickets"], start=1):
+                        match_count = len(set(ticket) & set(winning_numbers))
+                        if match_count == 6:
+                            prize = 1000000000
+                        elif match_count == 5:
+                            prize = 50000000
+                        elif match_count == 4:
+                            prize = 5000000
+                        elif match_count == 3:
+                            prize = 50000
+                        else:
+                            prize = 0
+                        total_prize += prize
+                        if prize > 0:
+                            winning_count += 1
+                            details.append(f"티켓 {idx}: {ticket} - {match_count}개 맞음 -> {prize:,}원")
+                    if details:
+                        message += "\n".join(details) + "\n"
+                        message += f"총 당첨금: {total_prize:,}원 (당첨 티켓 {winning_count}개)\n"
+                        if user_lotto.get("paid", False):
+                            message += "당첨금은 이미 지급되었습니다."
+                        else:
+                            message += "당첨금이 아직 지급되지 않았습니다."
+                    else:
+                        message += "당첨된 티켓이 없습니다."
                 else:
-                    messages.append("지난주 복권 당첨금이 아직 지급되지 않았습니다.")
+                        message += "복권 구매 기록이 없습니다."
             else:
-                messages.append("지난주 복권 구매 기록이 없습니다.")
-            messages.insert(0, result_line)
-        else:
-            messages.append("📢 지난 주 복권 당첨 번호가 아직 추첨되지 않았습니다!")
-
-        # 이번주 복권 결과 확인
-        result_current = self.db.lotto_result.find_one({"_id": current_week})
-        if result_current and result_current.get("numbers"):
-            numbers = result_current["numbers"]
-            result_line = f"📢 당첨 번호: `{' '.join(map(str, numbers))}`"
-            user_lotto_current = self.db.lotto.find_one({"_id": f"{user_id}_{current_week}"})
-            if user_lotto_current:
-                if user_lotto_current.get("paid", False):
-                    messages.append("이번주 복권 당첨금은 지급되었습니다.")
-                else:
-                    messages.append("이번주 복권 당첨금이 아직 지급되지 않았습니다.")
-            else:
-                messages.append("이번주 복권 구매 기록이 없습니다.")
-            messages.insert(0, result_line)
-        else:
-            messages.append("📢 이번 주 복권 당첨 번호가 아직 추첨되지 않았습니다!")
-
+                message += "당첨 번호가 아직 추첨되지 않았습니다."
+            messages.append(message)
         view = PaginationView(messages, title="복권 결과 확인")
         await ctx.send(content=view.get_page_content(), view=view)
 
@@ -349,16 +358,25 @@ class Lotto(commands.Cog):
                     if total_prize > 0:
                         # 사용자 잔액 업데이트
                         self.db.users.update_one({"_id": user_id}, {"$inc": {"money": total_prize}})
-                        # 개인 DM으로 당첨 내역 전송 (당첨 티켓 개수와 총 지급 금액 포함)
-                        await user_obj.send(
-                            f"🎊 이번 주 복권 당첨 결과:\n당첨 번호: `{' '.join(map(str, winning_numbers))}`\n"
-                            + "\n".join(prize_details)
-                            + f"\n\n당첨 티켓 수: 복권 {winning_count}개가 당첨되었습니다.\n총 {total_prize:,}원이 지급되었습니다."
-                        )
+                    
+                        # 당첨 내역을 20개씩 분할하여 DM 전송
+                        header = f"🎊 이번 주 복권 당첨 결과:\n당첨 번호: `{' '.join(map(str, winning_numbers))}`\n"
+                        footer = f"\n\n당첨 티켓 수: 복권 {winning_count}개가 당첨되었습니다.\n총 {total_prize:,}원이 지급되었습니다."
+                        chunk_size = 20
+                        for i in range(0, len(prize_details), chunk_size):
+                            chunk = prize_details[i : i + chunk_size]
+                            message_content = ""
+                            # 첫 번째 청크에는 header 추가
+                            if i == 0:
+                                message_content += header
+                            message_content += "\n".join(chunk)
+                            # 마지막 청크에는 footer 추가
+                            if i + chunk_size >= len(prize_details):
+                                message_content += footer
+                            await user_obj.send(message_content)
                     else:
                         await user_obj.send(
-                            f"😢 이번 주 복권 당첨 결과:\n당첨 번호: `{' '.join(map(str, winning_numbers))}`\n"
-                            "당첨 내역이 없습니다."
+                            f"😢 이번 주 복권 당첨 결과:\n당첨 번호: `{' '.join(map(str, winning_numbers))}`\n당첨 내역이 없습니다."
                         )
                 except Exception as e:
                     print(f"Error sending DM to user {user_id}: {e}")

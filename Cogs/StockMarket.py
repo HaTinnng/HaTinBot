@@ -1176,7 +1176,7 @@ class StockMarket(commands.Cog):
         )
 
         await ctx.send(
-            f"{ctx.author.mention}님, {SUPPORT_AMOUNT:,}원의 지원금을 받았습니다! 현재 잔액: {new_money:,}원\n"
+            f"{ctx.author.mention}님, {SUPPORT_AMOUNT:,.0f}원의 지원금을 받았습니다! 현재 잔액: {new_money:,.0f}원\n"
             f"지원금은 매일 0시, 12시에 초기화됩니다."
         )
 

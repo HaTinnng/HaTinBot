@@ -1834,7 +1834,7 @@ class StockMarket(commands.Cog):
         )
 
     # Cog 내에 추가할 #주식소각 명령어 구현 예시
-    @commands.command(name="주식소각")
+    @commands.command(name="주식소각", aliases=["소각"])
     async def burn_stock(self, ctx, stock_name: str = None, amount: str = None):
         """
         #주식소각 [주식명] [수량]:

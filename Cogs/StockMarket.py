@@ -1611,13 +1611,41 @@ class StockMarket(commands.Cog):
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "bank": new_bank}})
         await ctx.send(f"{ctx.author.mention}님, {withdraw_amount:,}원이 출금되었습니다. (은행 잔액: {new_bank:,}원, 현금: {new_money:,}원)")
 
+    # 대출 명령어 내에 사용할 확인용 View 클래스
+    class LoanConfirmView(discord.ui.View):
+        def __init__(self, author: discord.Member, loan_amount: int, timeout=30):
+            super().__init__(timeout=timeout)
+            self.author = author
+            self.value = None  # True: 대출 진행, False: 취소
+            self.loan_amount = loan_amount  # 실제 대출 원금
+
+        @discord.ui.button(label="예", style=discord.ButtonStyle.danger)
+        async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author.id:
+                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+                return
+            self.value = True
+            self.stop()
+            await interaction.response.send_message("대출을 진행합니다.", ephemeral=True)
+
+        @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)
+        async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author.id:
+                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+                return
+            self.value = False
+            self.stop()
+            await interaction.response.send_message("대출 진행이 취소되었습니다.", ephemeral=True)
+
+    # 기존 대출 명령어 수정 (예시)
     @commands.command(name="대출")
     async def take_loan(self, ctx, amount: str):
+        # 소수점 포함 금액 처리
         if '.' in amount:
             await ctx.send("소수점 이하의 금액은 입력할 수 없습니다. 정수 금액만 입력해주세요.")
             return
-        
-        # 1. 시즌(거래 가능 시간) 체크
+
+        # 거래 가능 시간(시즌) 체크
         try:
             if not self.is_trading_open():
                 await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
@@ -1626,7 +1654,7 @@ class StockMarket(commands.Cog):
             await ctx.send(f"시즌 체크 오류: {e}")
             return
 
-        # 2. 사용자 조회
+        # 사용자 조회
         try:
             user_id = str(ctx.author.id)
             user = self.db.users.find_one({"_id": user_id})
@@ -1637,7 +1665,7 @@ class StockMarket(commands.Cog):
             await ctx.send(f"사용자 조회 오류: {e}")
             return
 
-        # 3. 대출 이자 업데이트
+        # 대출 이자 업데이트 (기존 대출에 대해 일자별 3% 이자 등은 이 함수에서 처리)
         try:
             current_loan = self.update_loan_interest(user)
         except Exception as e:
@@ -1646,7 +1674,7 @@ class StockMarket(commands.Cog):
 
         max_loan = 5000000  # 최대 대출 한도
 
-        # 4. 입력값 처리
+        # 입력값 처리: "다" 등의 특수 토큰 또는 숫자 처리
         try:
             if amount.lower() in ["다", "all", "전부", "풀대출", "올인"]:
                 loan_amount = max_loan - current_loan
@@ -1662,14 +1690,33 @@ class StockMarket(commands.Cog):
             await ctx.send(f"대출 금액 처리 오류: {e}")
             return
 
-        if current_loan + loan_amount > max_loan:
+        # 여기서 즉시 5% 이자 적용: 실제 대출 금액은 loan_amount 이지만, 부채는 5%가 가산된 값으로 등록됩니다.
+        effective_loan = int(loan_amount * 1.05)
+
+        if current_loan + effective_loan > max_loan:
             available = max_loan - current_loan
-            await ctx.send(f"대출 한도는 총 {max_loan:,}원입니다. 현재 대출 잔액: {current_loan:,}원. 추가로 {available:,}원만 대출 가능합니다.")
+            await ctx.send(f"대출 한도는 총 {max_loan:,}원입니다. 현재 대출 잔액: {current_loan:,}원. 추가로 {available:,}원(즉, {int(available/1.05):,}원 원금)에 해당하는 대출만 가능합니다.")
             return
 
-        # 5. 사용자 대출 및 현금 정보 업데이트
+        # 대출 진행 전 확인 메시지와 버튼 표시 (명령어 실행자만 상호작용 가능)
+        view = LoanConfirmView(ctx.author, loan_amount)
+        await ctx.send(
+            f"⚠️ **대출 요청 확인**\n"
+            f"대출 원금: {loan_amount:,}원\n"
+            f"즉시 적용 이자 5%로 인한 상환 금액: {effective_loan:,}원\n"
+            f"(현재 대출 잔액: {current_loan:,}원, 최대 대출 한도: {max_loan:,}원)\n"
+            f"계속 진행하시겠습니까?",
+            view=view
+        )
+        await view.wait()
+        if view.value is None or view.value is False:
+            await ctx.send("대출 진행이 취소되었습니다.")
+            return
+
+        # 사용자 대출 및 현금 정보 업데이트:
+        # 실제로는 사용자는 loan_amount 만큼의 현금을 받고, 부채는 effective_loan 만큼 증가합니다.
         try:
-            new_loan = current_loan + loan_amount
+            new_loan = current_loan + effective_loan
             new_money = user.get("money", 0) + loan_amount
             loan_update = {
                 "amount": new_loan,
@@ -1680,9 +1727,10 @@ class StockMarket(commands.Cog):
             await ctx.send(f"대출 정보 업데이트 오류: {e}")
             return
 
-        # 6. 성공 메시지 전송
         try:
-            await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원의 대출을 받았습니다. (현재 대출 잔액: {new_loan:,}원, 현금: {new_money:,.0f}원)")
+            await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원을 대출받아 현금이 추가되었습니다.\n"
+                           f"즉시 적용된 5% 이자 반영으로 대출 상환해야 할 금액은 {effective_loan + current_loan:,}원입니다.\n"
+                           f"(현재 현금: {new_money:,}원)")
         except Exception as e:
             await ctx.send(f"메시지 전송 오류: {e}")
 
@@ -1758,6 +1806,109 @@ class StockMarket(commands.Cog):
             f"시즌 기간: {next_season_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {next_season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"시작까지 남은 시간: {remaining_str}"
         )
+    
+    # 주식 소각 명령어 내에 사용할 확인용 View 클래스
+    class StockBurnConfirmView(discord.ui.View):
+        def __init__(self, author: discord.Member, stock_name: str, burn_amount: int, timeout=30):
+            super().__init__(timeout=timeout)
+            self.author = author
+            self.stock_name = stock_name
+            self.burn_amount = burn_amount
+            self.value = None  # True: 소각 진행, False: 취소
+
+        @discord.ui.button(label="예", style=discord.ButtonStyle.danger)
+        async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author.id:
+                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+                return
+            self.value = True
+            self.stop()
+            await interaction.response.send_message("주식 소각을 진행합니다.", ephemeral=True)
+
+        @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)
+        async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if interaction.user.id != self.author.id:
+                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+                return
+            self.value = False
+            self.stop()
+            await interaction.response.send_message("주식 소각이 취소되었습니다.", ephemeral=True)
+
+    # Cog 내에 추가할 #주식소각 명령어 구현 예시
+    @commands.command(name="주식소각")
+    async def burn_stock(self, ctx, stock_name: str = None, amount: str = None):
+        """
+        #주식소각 [주식명] [수량]:
+        보유 중인 주식을 환급 없이 소각합니다.
+        예시: `#주식소각 썬더타이어 10`
+            `#주식소각 맥턴맥주 all`
+        """
+        if stock_name is None or amount is None:
+            await ctx.send("사용법: `#주식소각 주식명 수량` (예: `#주식소각 썬더타이어 10`)")
+            return
+
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가` 명령어로 참가해주세요.")
+            return
+
+        # 주식 종목 존재 여부 확인 (주식명으로 DB 조회)
+        stock = self.db.stocks.find_one({"name": stock_name})
+        if not stock:
+            await ctx.send("존재하지 않는 주식 종목입니다.")
+            return
+
+        portfolio = user.get("portfolio", {})
+        if stock["_id"] not in portfolio:
+            await ctx.send("해당 주식을 보유하고 있지 않습니다.")
+            return
+
+        current_amount = portfolio[stock["_id"]].get("amount", 0)
+        # 'all', '전부', '다' 등의 토큰 입력 시 전량 소각
+        if amount.lower() in ["all", "전부", "올인", "다", "풀소각"]:
+            burn_amount = current_amount
+        else:
+            try:
+                burn_amount = int(amount)
+                if burn_amount <= 0:
+                    await ctx.send("소각할 주식 수량은 1 이상이어야 합니다.")
+                    return
+            except Exception:
+                await ctx.send("소각할 주식 수량을 올바르게 입력해주세요.")
+                return
+
+        if burn_amount > current_amount:
+            await ctx.send("소각할 주식 수량이 보유 수량보다 많습니다.")
+            return
+
+        # 경고 메시지와 함께 확인 버튼 표시
+        view = StockBurnConfirmView(ctx.author, stock_name, burn_amount)
+        await ctx.send(
+            f"⚠️ **주식 소각 확인**\n"
+            f"소각할 주식: **{stock_name}**\n"
+            f"소각할 수량: **{burn_amount:,}주**\n"
+            f"※ 소각 시 보유 주식은 환급되지 않습니다.\n"
+            f"계속 진행하시겠습니까?",
+            view=view
+        )
+        await view.wait()
+        if view.value is None or view.value is False:
+            await ctx.send("주식 소각이 취소되었습니다.")
+            return
+
+        # 소각 진행: 소유 주식 수량에서 burn_amount만큼 차감
+        remaining = current_amount - burn_amount
+        if remaining > 0:
+            # 평균 구매 단가에 비례하여 total_cost도 갱신 (비례 배분)
+            avg_price = portfolio[stock["_id"]].get("total_cost", 0) / current_amount
+            new_total_cost = int(avg_price * remaining)
+            portfolio[stock["_id"]] = {"amount": remaining, "total_cost": new_total_cost}
+        else:
+         portfolio.pop(stock["_id"])
+
+        self.db.users.update_one({"_id": user_id}, {"$set": {"portfolio": portfolio}})
+        await ctx.send(f"{ctx.author.mention}님, **{stock_name}** 주식 {burn_amount:,.0f}주가 소각되었습니다. (남은 보유량: {remaining:,.0f}주)")
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

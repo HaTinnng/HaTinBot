@@ -217,6 +217,33 @@ def init_stocks():
     return stocks
 
 # ===== Discord Cog: StockMarket =====
+
+# 대출 명령어 내에 사용할 확인용 View 클래스
+class LoanConfirmView(discord.ui.View):
+    def __init__(self, author: discord.Member, loan_amount: int, timeout=30):
+        super().__init__(timeout=timeout)
+        self.author = author
+        self.value = None  # True: 대출 진행, False: 취소
+        self.loan_amount = loan_amount  # 실제 대출 원금
+
+    @discord.ui.button(label="예", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+            return
+        self.value = True
+        self.stop()
+        await interaction.response.send_message("대출을 진행합니다.", ephemeral=True)
+
+    @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
+            return
+        self.value = False
+        self.stop()
+        await interaction.response.send_message("대출 진행이 취소되었습니다.", ephemeral=True)
+
 class StockMarket(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -1611,33 +1638,6 @@ class StockMarket(commands.Cog):
         self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "bank": new_bank}})
         await ctx.send(f"{ctx.author.mention}님, {withdraw_amount:,}원이 출금되었습니다. (은행 잔액: {new_bank:,}원, 현금: {new_money:,}원)")
 
-    # 대출 명령어 내에 사용할 확인용 View 클래스
-    class LoanConfirmView(discord.ui.View):
-        def __init__(self, author: discord.Member, loan_amount: int, timeout=30):
-            super().__init__(timeout=timeout)
-            self.author = author
-            self.value = None  # True: 대출 진행, False: 취소
-            self.loan_amount = loan_amount  # 실제 대출 원금
-
-        @discord.ui.button(label="예", style=discord.ButtonStyle.danger)
-        async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author.id:
-                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
-                return
-            self.value = True
-            self.stop()
-            await interaction.response.send_message("대출을 진행합니다.", ephemeral=True)
-
-        @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)
-        async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-            if interaction.user.id != self.author.id:
-                await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
-                return
-            self.value = False
-            self.stop()
-            await interaction.response.send_message("대출 진행이 취소되었습니다.", ephemeral=True)
-
-    # 기존 대출 명령어 수정 (예시)
     @commands.command(name="대출")
     async def take_loan(self, ctx, amount: str):
         # 소수점 포함 금액 처리

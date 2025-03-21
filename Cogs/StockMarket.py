@@ -333,7 +333,7 @@ class StockMarket(commands.Cog):
     def is_trading_open(self):
         """
         거래 가능 여부를 결정합니다.
-        거래는 매월 1일 0시 10분부터 26일 0시 10분까지 진행됩니다.
+        거래는 매월 1일 0시 10분부터 28일 0시 10분까지 진행됩니다.
         그 외의 시간에는 거래가 중단됩니다.
         """
         
@@ -341,7 +341,7 @@ class StockMarket(commands.Cog):
         tz = pytz.timezone("Asia/Seoul")
         # 현재 달의 시즌 시작 및 종료 시각 (0시 10분 기준)
         season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
-        season_end = tz.localize(datetime(year=now.year, month=now.month, day=26, hour=0, minute=10, second=0))
+        season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))
         # 현재 시각이 시즌 기간 내에 있으면 거래 가능
         return season_start <= now < season_end
 
@@ -436,12 +436,12 @@ class StockMarket(commands.Cog):
     @tasks.loop(minutes=1)
     async def season_reset_loop(self):
         """
-        매 분마다 현재 시간을 확인하여, 매월 26일 0시 10분에 시즌 종료 및 초기화 처리를 진행합니다.
+        매 분마다 현재 시간을 확인하여, 매월 28일 0시 10분에 시즌 종료 및 초기화 처리를 진행합니다.
         시즌 종료 시 모든 유저의 자산을 산출하여 상위 3명에게 칭호를 부여한 후,
         모든 유저의 잔액과 포트폴리오를 초기화(기본금은 750,000원)하고 주식 데이터를 새로 초기화합니다.
         """
         now = self.get_seoul_time()
-        if now.day == 26 and now.hour == 0 and now.minute == 10:
+        if now.day == 28 and now.hour == 0 and now.minute == 10:
             if self.last_reset_month != (now.year, now.month):
                 await self.process_season_end(now)
                 self.last_reset_month = (now.year, now.month)
@@ -504,7 +504,7 @@ class StockMarket(commands.Cog):
         # 시즌 진행 기간: 이번 달 1일 0시 10분 ~ 26일 0시 10분 (한국 시간 기준)
         tz = pytz.timezone("Asia/Seoul")
         season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
-        season_end = tz.localize(datetime(year=now.year, month=now.month, day=26, hour=0, minute=10, second=0))
+        season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))
 
         # 시즌 결과 기록 문서에 진행 기간 추가
         season_result_doc = {
@@ -1035,7 +1035,7 @@ class StockMarket(commands.Cog):
     async def season_info(self, ctx):
         """
         #시즌:
-        현재 시즌명과 시즌 진행 기간(시작: 매월 1일 0시 10분, 종료: 매월 26일 0시 10분),
+        현재 시즌명과 시즌 진행 기간(시작: 매월 1일 0시 10분, 종료: 매월 28일 0시 10분),
         남은 시간(현재 시즌 종료까지 또는 다음 시즌 시작까지)을 보여줍니다.
         """
         season = self.db.season.find_one({"_id": "season"})
@@ -1046,7 +1046,7 @@ class StockMarket(commands.Cog):
         if now.day < 26:
             # 현재 시즌 진행 중: 이번 달 1일 ~ 26일
             season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
-            season_end = tz.localize(datetime(year=now.year, month=now.month, day=26, hour=0, minute=10, second=0))
+            season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))
             remaining = season_end - now
         else:
             # 시즌 종료 후: 다음 시즌 시작 정보를 표시
@@ -1057,7 +1057,7 @@ class StockMarket(commands.Cog):
                 next_year = now.year
                 next_month = now.month + 1
             season_start = tz.localize(datetime(year=next_year, month=next_month, day=1, hour=0, minute=10, second=0))
-            season_end = tz.localize(datetime(year=next_year, month=next_month, day=26, hour=0, minute=10, second=0))
+            season_end = tz.localize(datetime(year=next_year, month=next_month, day=28, hour=0, minute=10, second=0))
             remaining = season_start - now
 
         days = remaining.days
@@ -1804,7 +1804,7 @@ class StockMarket(commands.Cog):
         """
         #다음시즌:
         현재 진행 중인 시즌이 아닌, 다음에 진행될 시즌에 대한 정보를 출력합니다.
-        (시즌 기간은 매월 1일 0시 10분부터 26일 0시 10분까지로 설정)
+        (시즌 기간은 매월 1일 0시 10분부터 28일 0시 10분까지로 설정)
         """
         now = self.get_seoul_time()
         tz = pytz.timezone("Asia/Seoul")
@@ -1818,7 +1818,7 @@ class StockMarket(commands.Cog):
             next_month = now.month + 1
         
         next_season_start = tz.localize(datetime(next_year, next_month, 1, 0, 10, 0))
-        next_season_end = tz.localize(datetime(next_year, next_month, 26, 0, 10, 0))
+        next_season_end = tz.localize(datetime(next_year, next_month, 28, 0, 10, 0))
         
         # 남은 시간을 계산합니다.
         remaining = next_season_start - now

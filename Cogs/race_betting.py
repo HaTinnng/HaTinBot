@@ -31,11 +31,11 @@ class RaceBetting(commands.Cog):
     def get_season_identifier(self):
         """
         현재 시즌을 "연도-월" 형식으로 반환합니다.
-        만약 현재 날짜가 26일 이상이면 다음 달의 시즌으로 간주합니다.
+        만약 현재 날짜가 28일 이상이면 다음 달의 시즌으로 간주합니다.
         """
         tz = pytz.timezone("Asia/Seoul")
         now = datetime.now(tz)
-        if now.day < 26:
+        if now.day < 28:
             return f"{now.year}-{now.month:02d}"
         else:
             if now.month == 12:
@@ -79,12 +79,12 @@ class RaceBetting(commands.Cog):
 
     def is_race_available(self):
         """
-        경마 베팅은 주식 게임의 시즌(매월 1일 0시 10분 ~ 26일 0시 10분) 동안에만 이용 가능합니다.
+        경마 베팅은 주식 게임의 시즌(매월 1일 0시 10분 ~ 28일 0시 10분) 동안에만 이용 가능합니다.
         """
         tz = pytz.timezone("Asia/Seoul")
         now = datetime.now(tz)
         season_start = tz.localize(datetime(now.year, now.month, 1, 0, 10, 0))
-        season_end = tz.localize(datetime(now.year, now.month, 26, 0, 10, 0))
+        season_end = tz.localize(datetime(now.year, now.month, 28, 0, 10, 0))
         return season_start <= now < season_end
 
     def ensure_race_participation(self, user):

@@ -82,7 +82,7 @@ def global_stock_season_check(ctx):
     now = datetime.now(pytz.timezone("Asia/Seoul"))
     try:
         season_start = now.replace(day=1, hour=0, minute=10, second=0, microsecond=0)
-        season_end = now.replace(day=26, hour=0, minute=10, second=0, microsecond=0)
+        season_end = now.replace(day=28, hour=0, minute=10, second=0, microsecond=0)
     except ValueError:
         # 예외 발생 시 기본적으로 허용
         return True
@@ -391,9 +391,9 @@ class Lotto(commands.Cog):
     
     @tasks.loop(minutes=1)
     async def lotto_reset_task(self):
-        """매월 26일 0시 10분에 복권 데이터 초기화"""
+        """매월 28일 0시 10분에 복권 데이터 초기화"""
         now = self.get_seoul_time()
-        if now.day == 26 and now.hour == 0 and now.minute == 10:
+        if now.day == 28 and now.hour == 0 and now.minute == 10:
             if self.last_reset_month != now.month:
                 self.db.lotto.delete_many({})
                 self.db.lotto_result.delete_many({})

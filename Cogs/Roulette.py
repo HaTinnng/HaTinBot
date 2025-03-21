@@ -15,7 +15,7 @@ def is_season_active() -> bool:
     tz = pytz.timezone("Asia/Seoul")
     now = datetime.now(tz)
     start = tz.localize(datetime(now.year, now.month, 1, 0, 10))
-    end = tz.localize(datetime(now.year, now.month, 26, 0, 10))
+    end = tz.localize(datetime(now.year, now.month, 28, 0, 10))
     return start <= now < end
 
 class AllInConfirmationView(discord.ui.View):

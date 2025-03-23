@@ -137,7 +137,7 @@ class Lotto(commands.Cog):
         user = self.db.users.find_one({"_id": user_id})
         now = self.get_seoul_time()
         season_start = now.replace(day=1, hour=0, minute=10, second=0, microsecond=0)
-        season_end = now.replace(day=26, hour=0, minute=10, second=0, microsecond=0)
+        season_end = now.replace(day=28, hour=0, minute=10, second=0, microsecond=0)
         next_draw = self.get_next_lotto_draw_time()
         if not (season_start <= next_draw < season_end):
             await ctx.send("❌ 다음 로또 추첨일이 현재 주식 시즌에 포함되지 않으므로 복권 구매가 불가능합니다!")

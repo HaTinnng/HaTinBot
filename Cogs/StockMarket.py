@@ -1044,7 +1044,7 @@ class StockMarket(commands.Cog):
         tz = pytz.timezone("Asia/Seoul")
         
         if now.day < 26:
-            # 현재 시즌 진행 중: 이번 달 1일 ~ 26일
+            # 현재 시즌 진행 중: 이번 달 1일 ~ 28일
             season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
             season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))
             remaining = season_end - now

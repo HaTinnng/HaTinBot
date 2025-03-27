@@ -1287,7 +1287,6 @@ class StockMarket(commands.Cog):
         # 각 쿠폰 코드는 지급 금액과 최대 사용 횟수를 포함합니다.
         valid_coupons = {
             "2025Season2": {"reward": 300000, "max_usage": 1},
-            "버그보상": {"reward": 50000000, "max_usage": 1},
             # "": {"reward": 200000, "max_usage": 2} 다음 원하는 거 추가
         }
 
@@ -1323,7 +1322,7 @@ class StockMarket(commands.Cog):
 
         await ctx.send(
             f"🎉 {ctx.author.mention}님, 쿠폰이 적용되었습니다! `{reward_amount:,}원`을 지급받았습니다.\n"
-            f"현재 잔액: `{new_money}원`\n"
+            f"현재 잔액: `{new_money:,.0f}원`\n"
             f"이 쿠폰은 총 {max_coupon_usage}회 사용 가능하며, 현재 사용 횟수: {coupon_usage[coupon_code]}회 사용했습니다."
         )
 

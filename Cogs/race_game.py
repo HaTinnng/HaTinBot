@@ -4,6 +4,8 @@ from discord.ext import commands
 import random
 import asyncio
 from pymongo import MongoClient
+from datetime import datetime
+import pytz
 
 # ===== 상수 설정 =====
 RACE_TRACK_LENGTH = 20      # 레이스 트랙 길이 (칸 수)
@@ -23,6 +25,14 @@ class RaceGame(commands.Cog):
     def cog_unload(self):
         self.mongo_client.close()
 
+    # 시즌이 열려있는지 확인 (매월 1일 0시 10분 ~ 28일 0시 10분)
+    def is_season_open(self):
+        tz = pytz.timezone("Asia/Seoul")
+        now = datetime.now(tz)
+        season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
+        season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))
+        return season_start <= now < season_end
+
     @commands.command(name="레이스베팅")
     async def race_bet(self, ctx, choice: str, bet: str):
         """
@@ -38,6 +48,11 @@ class RaceGame(commands.Cog):
         - 베팅 금액은 즉시 현금(예금이 아님)에서 차감되며,
           선택한 레인이 승리할 경우 베팅 금액의 **{PAYOUT_MULTIPLIER}배**를 상금으로 획득합니다.
         """
+        # 시즌 체크: 레이스 게임은 매월 1일 0시 10분부터 28일 0시 10분까지 이용 가능
+        if not self.is_season_open():
+            await ctx.send("현재 시즌 종료 중입니다. 레이스 게임은 거래 가능 시간(매월 1일 0시 10분 ~ 28일 0시 10분)에만 이용 가능합니다.")
+            return
+
         # 레인 선택 검증: 1, 2, 3 중 하나여야 함
         if choice not in ["1", "2", "3"]:
             await ctx.send("레인 선택은 1, 2 또는 3 중 하나여야 합니다.")

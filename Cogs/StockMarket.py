@@ -1043,7 +1043,7 @@ class StockMarket(commands.Cog):
         now = self.get_seoul_time()
         tz = pytz.timezone("Asia/Seoul")
         
-        if now.day < 26:
+        if now.day < 28:
             # 현재 시즌 진행 중: 이번 달 1일 ~ 28일
             season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
             season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))
@@ -1287,6 +1287,7 @@ class StockMarket(commands.Cog):
         # 각 쿠폰 코드는 지급 금액과 최대 사용 횟수를 포함합니다.
         valid_coupons = {
             "2025Season2": {"reward": 300000, "max_usage": 1},
+            "버그보상": {"reward": 50000000, "max_usage": 1},
             # "": {"reward": 200000, "max_usage": 2} 다음 원하는 거 추가
         }
 

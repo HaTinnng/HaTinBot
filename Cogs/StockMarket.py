@@ -520,7 +520,7 @@ class StockMarket(commands.Cog):
                     "rank": idx,
                     "user_id": user_id,
                     "username": user.get("username", "알 수 없음"),
-                    "total_assets": total_assets
+                    "total_assets": int(total_assets)
                 })
         self.db.season_results.insert_one(season_result_doc)
 

@@ -4,6 +4,8 @@ from discord.ext import commands
 import random
 import asyncio
 from pymongo import MongoClient
+from datetime import datetime
+import pytz
 
 # ===== 상수 설정 =====
 RACE_TRACK_LENGTH = 40      # 시작점(|)과 도착점(🏁) 사이의 칸 수 (40칸)
@@ -26,6 +28,17 @@ class MultiRaceGame(commands.Cog):
 
     def cog_unload(self):
         self.mongo_client.close()
+
+    def is_season_open(self):
+        """
+        서울 기준으로 시즌이 열려있는지 확인합니다.
+        시즌: 매월 1일 0시 10분 ~ 28일 0시 10분
+        """
+        tz = pytz.timezone("Asia/Seoul")
+        now = datetime.now(tz)
+        season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
+        season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))
+        return season_start <= now < season_end
 
     async def auto_start_race(self):
         """자동 시작 타이머: 방 생성 후 AUTO_START_DELAY(2분) 후 레이스 시작"""
@@ -66,7 +79,7 @@ class MultiRaceGame(commands.Cog):
             " - 방을 만들고 2분뒤에 자동으로 시작합니다.\n"
             " - 승리 시 베팅한 금액을 상금으로 획득합니다.\n"
             " - 베팅 금액은 즉시 차감됩니다.\n"
-            "```"
+            "```\n"
         )
         await ctx.send(help_text)
 
@@ -76,9 +89,14 @@ class MultiRaceGame(commands.Cog):
         #레이스참가 [금액]:
         멀티 레이스 방에 참가합니다.
         - 새 방을 생성하는 경우, 베팅 금액을 입력해야 합니다.
-          (베팅 금액으로 '0' 또는 '.'를 입력하면 무료로 진행됩니다.)
+          (베팅 금액으로 '0' 또는 '.'를 입력하면 무료로 진행합니다.)
         - 이미 방이 존재하는 경우, 입력 없이 참가하면 방장이 설정한 금액과 동일하게 적용됩니다.
         """
+        # 시즌 체크: 레이스 게임은 매월 1일 0시 10분부터 28일 0시 10분까지 이용 가능
+        if not self.is_season_open():
+            await ctx.send("현재 시즌 종료 중입니다. 레이스 게임은 거래 가능 시간(매월 1일 0시 10분 ~ 28일 0시 10분)에만 이용 가능합니다.")
+            return
+
         user_id = str(ctx.author.id)
         # DB에서 사용자 조회 (주식 게임 참가 여부 확인)
         user = self.db.users.find_one({"_id": user_id})
@@ -149,7 +167,6 @@ class MultiRaceGame(commands.Cog):
         self.current_race["participants"].append(participant)
         self.current_race["total_bet"] += room_bet
 
-        # 꾸며진 메시지 출력
         decoration = "✨🌟✨"
         bet_text = f"{room_bet:,}원" if room_bet > 0 else "무료"
         await ctx.send(f"{decoration} {ctx.author.mention}님이 {bet_text}을(를) 베팅하고 레이스에 참가하셨습니다! 🎉 (현재 참가자 수: {len(self.current_race['participants'])}) {decoration}")
@@ -160,6 +177,11 @@ class MultiRaceGame(commands.Cog):
         #레이스시작:
         현재 방의 레이스를 수동으로 시작합니다.
         """
+        # 시즌 체크: 레이스 게임은 시즌 내에서만 이용 가능
+        if not self.is_season_open():
+            await ctx.send("현재 시즌 종료 중입니다. 레이스 게임은 거래 가능 시간(매월 1일 0시 10분 ~ 28일 0시 10분)에만 이용 가능합니다.")
+            return
+
         if self.current_race is None:
             await ctx.send("현재 진행 중인 레이스 방이 없습니다.")
             return
@@ -223,7 +245,7 @@ class MultiRaceGame(commands.Cog):
 
         while not finished:
             for participant in participants:
-                # 각 참가자가 0~5칸씩 전진
+                # 각 참가자가 1~4칸씩 전진
                 participant["position"] += random.randint(1, 4)
                 if participant["position"] >= RACE_TRACK_LENGTH:
                     participant["position"] = RACE_TRACK_LENGTH
@@ -231,7 +253,6 @@ class MultiRaceGame(commands.Cog):
                     winner = participant
                     break
 
-            # 고정된 시작점(|)과 도착점(🏁) 사이에서 동물 이모지가 이동하는 트랙 표시
             display = "🐾 **멀티 레이스 진행 상황** 🏁\n\n"
             for idx, participant in enumerate(participants, start=1):
                 pos = participant["position"]

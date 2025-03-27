@@ -501,7 +501,7 @@ class StockMarket(commands.Cog):
         season = self.db.season.find_one({"_id": "season"})
         season_name = f"{season['year']} 시즌{season['season_no']}"
 
-        # 시즌 진행 기간: 이번 달 1일 0시 10분 ~ 26일 0시 10분 (한국 시간 기준)
+        # 시즌 진행 기간: 이번 달 1일 0시 10분 ~ 28일 0시 10분 (한국 시간 기준)
         tz = pytz.timezone("Asia/Seoul")
         season_start = tz.localize(datetime(year=now.year, month=now.month, day=1, hour=0, minute=10, second=0))
         season_end = tz.localize(datetime(year=now.year, month=now.month, day=28, hour=0, minute=10, second=0))

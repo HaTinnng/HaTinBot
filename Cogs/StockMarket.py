@@ -286,7 +286,7 @@ class StockBurnConfirmView(discord.ui.View):
             await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
             return
         self.value = True
-               self.stop()
+        self.stop()
         await interaction.response.send_message("주식 소각을 진행합니다.", ephemeral=True)
 
     @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)

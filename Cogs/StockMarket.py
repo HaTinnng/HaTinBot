@@ -1764,13 +1764,16 @@ class StockMarket(commands.Cog):
         await ctx.send(f"{ctx.author.mention}님, **{stock_name}** 주식 {burn_amount:,.0f}주가 소각되었습니다. (남은 보유량: {remaining:,.0f}주)")
 
     @commands.command(name="시장그래프", aliases=["전체그래프", "종목그래프"])
-    async def market_graph(self, ctx):
+    async def market_graph(self, ctx, mode: str = "변동률"):
         """
-        #시장그래프:
+        #시장그래프 [모드]:
         모든 종목의 최근 추세를 한 그래프에 표시합니다.
-        - 가격 숫자/라벨을 숨깁니다(축 눈금과 데이터 라벨 비표시).
-        - 각 종목은 서로 다른 선 스타일/색상으로 구분합니다.
-        - 생성 중에 상태 메시지를 보여줍니다.
+        - 기본: 변동률(정규화) 기준으로 그림 (첫 값=100으로 환산)
+        - '원본' 입력 시 원본 가격 기준으로 그림
+        - 축의 가격 숫자/라벨은 숨깁니다.
+        - 생성 중 상태 메시지를 표시합니다.
+        예) #시장그래프            -> 변동률(정규화)
+            #시장그래프 원본       -> 원본 가격 기준
         """
         # 1) 상태 메시지 먼저 전송
         status_msg = await ctx.send("📊 시장 그래프 생성 중...")
@@ -1791,6 +1794,9 @@ class StockMarket(commands.Cog):
             except Exception:
                 pass
             plt.rcParams["axes.unicode_minus"] = False
+    
+            # 모드 판별: 변동률(정규화) 여부
+            normalize = mode.lower() not in ["원본", "raw", "original"]
 
             # 2) 그래프 생성
             plt.figure(figsize=(8, 5))
@@ -1812,22 +1818,31 @@ class StockMarket(commands.Cog):
                 if not history or all(v == 0 for v in history):
                     continue
 
+                y_values = history
+                if normalize:
+                    first = history[0]
+                    # 첫 값이 0이거나 음수면 정규화 불가 → 스킵
+                    if first is None or first <= 0:
+                        continue
+                    # 첫 값을 100으로 맞추는 지수화(변동률 기준)
+                    y_values = [(v / first) * 100.0 for v in history]
+
                 ls = line_styles[style_idx % len(line_styles)]
                 style_idx += 1
 
                 ax.plot(
-                    range(len(history)),
-                    history,
+                    range(len(y_values)),
+                    y_values,
                     linestyle=ls,
                     marker=None,
                     linewidth=2,
                     label=stock.get("name", "Unknown"),
                 )
-                max_len = max(max_len, len(history))
+                max_len = max(max_len, len(y_values))
                 plotted_any = True
 
             if not plotted_any:
-                await status_msg.edit(content="⚠️ 그릴 데이터가 없습니다. (모든 종목의 기록이 비어있거나 0입니다)")
+                await status_msg.edit(content="⚠️ 그릴 데이터가 없습니다. (모든 종목의 기록이 비어있거나 정규화 불가)")
                 plt.close()
                 return
 
@@ -1840,9 +1855,13 @@ class StockMarket(commands.Cog):
             ax.set_xticklabels(xtick_labels(max_len))
 
             # 제목/레이아웃
-            ax.set_title("전체 종목 최근 추세 (가격 숫자 숨김)", fontsize=14, fontweight="bold")
+            if normalize:
+                ax.set_title("전체 종목 최근 추세 — 변동률 기준 (첫 값=100)", fontsize=14, fontweight="bold")
+            else:
+                ax.set_title("전체 종목 최근 추세 — 원본 가격 기준", fontsize=14, fontweight="bold")
+
             ax.set_xlabel("측정 간격(최근=0)")
-            ax.set_ylabel("")
+            ax.set_ylabel("")  # y축 라벨 제거
             ax.grid(True, alpha=0.2)
 
             # 범례(바깥쪽)

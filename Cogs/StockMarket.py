@@ -1770,12 +1770,11 @@ class StockMarket(commands.Cog):
         모든 종목의 최근 추세를 한 그래프에 표시합니다.
         - 기본: 변동률(정규화) 기준으로 그림 (첫 값=100으로 환산)
         - '원본' 입력 시 원본 가격 기준으로 그림
-        - 축의 가격 숫자/라벨은 숨깁니다.
+        - 변동률 모드에서는 세로축에 % 단위 숫자 표시
         - 생성 중 상태 메시지를 표시합니다.
         예) #시장그래프            -> 변동률(정규화)
             #시장그래프 원본       -> 원본 가격 기준
         """
-        # 1) 상태 메시지 먼저 전송
         status_msg = await ctx.send("📊 시장 그래프 생성 중...")
 
         try:
@@ -1784,7 +1783,7 @@ class StockMarket(commands.Cog):
                 await status_msg.edit(content="📉 현재 등록된 주식이 없습니다.")
                 return
 
-            # 폰트(선택): 존재하면 사용, 실패해도 무시
+            # 폰트(선택)
             try:
                 font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", "온글잎 나나양.ttf")
                 if os.path.exists(font_path):
@@ -1794,37 +1793,30 @@ class StockMarket(commands.Cog):
             except Exception:
                 pass
             plt.rcParams["axes.unicode_minus"] = False
-    
-            # 모드 판별: 변동률(정규화) 여부
+
             normalize = mode.lower() not in ["원본", "raw", "original"]
 
-            # 2) 그래프 생성
             plt.figure(figsize=(8, 5))
             ax = plt.gca()
 
-            # 서로 다른 선 스타일(색상은 기본 사이클)
             line_styles = ["-", "--", "-.", ":"]
             style_idx = 0
             plotted_any = False
+            max_len = 0
 
-            # x축 라벨을 -n+1 ~ 0 로 표시
             def xtick_labels(n):
                 return list(range(-n + 1, 1))
 
-            max_len = 0
             for stock in stocks:
                 history = stock.get("history", [])
-                # 기록이 없거나 전부 0이면 스킵
                 if not history or all(v == 0 for v in history):
                     continue
 
                 y_values = history
                 if normalize:
                     first = history[0]
-                    # 첫 값이 0이거나 음수면 정규화 불가 → 스킵
                     if first is None or first <= 0:
                         continue
-                    # 첫 값을 100으로 맞추는 지수화(변동률 기준)
                     y_values = [(v / first) * 100.0 for v in history]
 
                 ls = line_styles[style_idx % len(line_styles)]
@@ -1846,29 +1838,26 @@ class StockMarket(commands.Cog):
                 plt.close()
                 return
 
-            # 가격 숫자/라벨 숨기기
-            ax.yaxis.set_major_formatter(plt.NullFormatter())
-            ax.tick_params(axis="y", which="both", length=0, labelleft=False)
-
-            # x축 눈금 라벨을 -n+1 ~ 0
+            # X축 설정
             ax.set_xticks(list(range(max_len)))
             ax.set_xticklabels(xtick_labels(max_len))
 
             # 제목/레이아웃
             if normalize:
-                ax.set_title("전체 종목 최근 추세 — 변동률 기준 (첫 값=100)", fontsize=14, fontweight="bold")
+                ax.set_title("전체 종목 최근 추세 — 변동률 기준 (첫 값=100%)", fontsize=14, fontweight="bold")
+                ax.set_ylabel("변동률 (%)")  # ← 퍼센트 표시
             else:
                 ax.set_title("전체 종목 최근 추세 — 원본 가격 기준", fontsize=14, fontweight="bold")
+                ax.set_ylabel("가격")
 
             ax.set_xlabel("측정 간격(최근=0)")
-            ax.set_ylabel("")  # y축 라벨 제거
-            ax.grid(True, alpha=0.2)
+            ax.grid(True, alpha=0.3)
 
             # 범례(바깥쪽)
             ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0., fontsize=9)
             plt.tight_layout()
 
-            # 3) 이미지로 전송
+            # 이미지로 전송
             buf = io.BytesIO()
             plt.savefig(buf, format="png", bbox_inches="tight")
             buf.seek(0)
@@ -1876,17 +1865,14 @@ class StockMarket(commands.Cog):
 
             file = discord.File(fp=buf, filename="market_overview.png")
             await ctx.send(file=file)
-
-            # 4) 상태 메시지 업데이트
             await status_msg.edit(content="✅ 시장 그래프 생성 완료")
 
         except Exception as e:
-            # 에러 시 상태 메시지로 안내
             await status_msg.edit(content=f"❌ 시장 그래프 생성 중 오류가 발생했습니다: {e}")
             try:
                 plt.close()
             except Exception:
                 pass
-       
+      
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

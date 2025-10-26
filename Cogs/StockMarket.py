@@ -1762,6 +1762,98 @@ class StockMarket(commands.Cog):
 
         self.db.users.update_one({"_id": user_id}, {"$set": {"portfolio": portfolio}})
         await ctx.send(f"{ctx.author.mention}님, **{stock_name}** 주식 {burn_amount:,.0f}주가 소각되었습니다. (남은 보유량: {remaining:,.0f}주)")
-        
+
+    @commands.command(name="시장그래프", aliases=["전체그래프", "종목그래프"])
+    async def market_graph(self, ctx):
+        """
+        #시장그래프:
+        모든 종목의 최근 추세를 한 그래프에 표시합니다.
+        - 가격 숫자/라벨을 숨깁니다(축 눈금과 데이터 라벨 비표시).
+        - 각 종목은 서로 다른 선 스타일/색상으로 구분합니다.
+        """
+        # 거래 가능 시간에만 보여주고 싶다면 아래 주석 해제
+        # if not self.is_trading_open():
+        #     await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+        #     return
+
+        stocks = list(self.db.stocks.find({}).sort("_id", 1))
+        if not stocks:
+            await ctx.send("📉 현재 등록된 주식이 없습니다.")
+            return
+
+        # 폰트(선택): 프로젝트/fonts/온글잎 나나양.ttf 존재 시 사용
+        try:
+            font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", "온글잎 나나양.ttf")
+            if os.path.exists(font_path):
+                fm.fontManager.addfont(font_path)
+                font_prop = fm.FontProperties(fname=font_path)
+                plt.rcParams["font.family"] = font_prop.get_name()
+        except Exception:
+            pass
+        plt.rcParams["axes.unicode_minus"] = False
+
+        # 그리기
+        plt.figure(figsize=(8, 5))
+        ax = plt.gca()
+
+        # 서로 다른 선 스타일을 섞어서 사용 (색상은 matplotlib 기본 사이클)
+        line_styles = ["-", "--", "-.", ":"]
+        style_idx = 0
+
+        # x축 라벨: 최근 5회면 -4 ~ 0
+        # 길이가 5 미만인 경우 동적으로 맞춤
+        def xtick_labels(n):
+            return list(range(-n + 1, 1))
+
+        for stock in stocks:
+            history = stock.get("history", [])
+            # 데이터가 없거나 모두 0이면 스킵
+            if not history or all(v == 0 for v in history):
+                continue
+
+            ls = line_styles[style_idx % len(line_styles)]
+            style_idx += 1
+
+            ax.plot(
+                range(len(history)),
+                history,
+                linestyle=ls,
+                marker=None,
+                linewidth=2,
+                label=stock.get("name", "Unknown"),
+            )
+
+        # 가격 숫자/라벨 숨기기
+        ax.yaxis.set_major_formatter(plt.NullFormatter())
+        ax.tick_params(axis="y", which="both", length=0, labelleft=False)
+
+        # x축 눈금 라벨을 -n+1 ~ 0으로 (최근이 0)
+        max_len = max((len(s.get("history", [])) for s in stocks), default=0)
+        if max_len > 0:
+            ax.set_xticks(list(range(max_len)))
+            ax.set_xticklabels(xtick_labels(max_len))
+
+        # 제목/레이아웃 (가격 숫자 노출 없이 대략적 추세만)
+        ax.set_title("전체 종목 최근 추세 (가격 숫자 숨김)", fontsize=14, fontweight="bold")
+        ax.set_xlabel("측정 간격(최근=0)")
+        # y축 라벨 제거(숫자 노출 방지)
+        ax.set_ylabel("")
+
+        # 약한 격자 (수치가 보이지 않더라도 방향감만)
+        ax.grid(True, alpha=0.2)
+
+        # 범례: 너무 길어지면 바깥쪽 배치
+        ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0., fontsize=9)
+        plt.tight_layout()
+
+        # 이미지로 전송
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", bbox_inches="tight")
+        buf.seek(0)
+        plt.close()
+
+        file = discord.File(fp=buf, filename="market_overview.png")
+        await ctx.send(file=file)
+       
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

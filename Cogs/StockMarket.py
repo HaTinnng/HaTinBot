@@ -1533,41 +1533,37 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="대출")
     async def take_loan(self, ctx, amount: str):
+        # 소수점 금지
         if '.' in amount:
             await ctx.send("소수점 이하의 금액은 입력할 수 없습니다. 정수 금액만 입력해주세요.")
             return
-        try:
-            if not self.is_trading_open():
-                await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
-                return
-        except Exception as e:
-            await ctx.send(f"[LOAN_001] 대출 기능 체크 오류: {e}")
+
+        # 거래 가능 시간 체크
+        if not self.is_trading_open():
+            await ctx.send("대출 기능은 거래 가능 시간(시즌)에서만 사용할 수 있습니다.")
             return
 
-        try:
-            user_id = str(ctx.author.id)
-            user = self.db.users.find_one({"_id": user_id})
-            if not user:
-                await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
-                return
-        except Exception as e:
-            await ctx.send(f"[LOAN_002] 사용자 조회 오류: {e}")
+        # 유저 조회
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 참가해주세요.")
             return
 
-        try:
-            current_loan = self.update_loan_interest(user)
-        except Exception as e:
-            await ctx.send(f"[LOAN_003] 대출 이자 업데이트 오류: {e}")
-            return
+        # 현재 부채(이자 포함) 최신화
+        current_loan = self.update_loan_interest(user)
+        # 최신 값 재조회(중요)
+        user = self.db.users.find_one({"_id": user_id})
+        loan_info = user.get("loan", {})
+        current_loan = int(loan_info.get("amount", 0))
+    
+        max_loan = 5_000_000
+        available = max(0, max_loan - current_loan)  # 한도 체크는 '부채총액' 대비 남은 여지
 
-        max_loan = 5000000
-
+        # 신청 금액 결정
         try:
             if amount.lower() in ["다", "all", "전부", "풀대출", "올인"]:
-                loan_amount = max_loan - current_loan
-                if loan_amount <= 0:
-                    await ctx.send("이미 최대 대출 한도에 도달했습니다.")
-                    return
+                loan_amount = available
             else:
                 loan_amount = int(amount)
                 if loan_amount <= 0:
@@ -1577,19 +1573,21 @@ class StockMarket(commands.Cog):
             await ctx.send(f"[LOAN_004] 대출 금액 처리 오류: {e}")
             return
 
-        effective_loan = int(loan_amount * 1.05)
-
-        if current_loan + effective_loan > max_loan:
-            available = max_loan - current_loan
-            await ctx.send(f"대출 한도는 총 {max_loan:,}원입니다. 현재 대출 잔액: {current_loan:,}원. 추가로 {available:,}원(즉, {int(available/1.05):,}원 원금)에 해당하는 대출만 가능합니다.")
+        if loan_amount == 0:
+            await ctx.send(f"이미 최대 대출 한도({max_loan:,}원)에 도달했습니다. 현재 부채: {current_loan:,}원")
             return
 
+        if loan_amount > available:
+            await ctx.send(f"대출 한도 초과입니다. 남은 한도: {available:,}원")
+            return
+
+        # 확인 뷰
         view = LoanConfirmView(ctx.author, loan_amount)
         await ctx.send(
-            f"⚠️ **대출 요청 확인**\n"
-            f"대출 원금: {loan_amount:,}원\n"
-            f"즉시 적용 이자 5%로 인한 상환 금액: {effective_loan:,}원\n"
-            f"(현재 대출 잔액: {current_loan:,}원, 최대 대출 한도: {max_loan:,}원)\n"
+            "⚠️ **대출 요청 확인**\n"
+            f"대출 금액(원금): {loan_amount:,}원\n"
+            f"대출 후 부채 총액(이자 별도 누적): {current_loan + loan_amount:,}원\n"
+            f"(최대 한도: {max_loan:,}원)\n"
             f"계속 진행하시겠습니까?",
             view=view
         )
@@ -1598,24 +1596,24 @@ class StockMarket(commands.Cog):
             await ctx.send("대출 진행이 취소되었습니다.")
             return
 
-        try:
-            new_loan = current_loan + effective_loan
-            new_money = user.get("money", 0) + loan_amount
-            loan_update = {
-                "amount": new_loan,
-                "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            self.db.users.update_one({"_id": user_id}, {"$set": {"money": new_money, "loan": loan_update}})
-        except Exception as e:
-            await ctx.send(f"[LOAN_005] 대출 정보 업데이트 오류: {e}")
-            return
+        # DB 반영 (수수료 없음: 현금은 loan_amount만큼 증가, 부채도 loan_amount만 증가)
+        new_money = user.get("money", 0) + loan_amount
+        new_loan_total = current_loan + loan_amount
+        self.db.users.update_one(
+            {"_id": user_id},
+            {"$set": {
+                "money": new_money,
+                "loan": {
+                    "amount": new_loan_total,
+                    "last_update": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            }}
+        )
 
-        try:
-            await ctx.send(f"{ctx.author.mention}님, {loan_amount:,}원을 대출받아 현금이 추가되었습니다.\n"
-                           f"즉시 적용된 5% 이자 반영으로 대출 상환해야 할 금액은 {effective_loan + current_loan:,}원입니다.\n"
-                           f"(현재 현금: {new_money:,.0f}원)")
-        except Exception as e:
-            await ctx.send(f"[LOAN_006] 메시지 전송 오류: {e}")
+        await ctx.send(
+            f"{ctx.author.mention}님, **{loan_amount:,}원** 대출이 완료되었습니다.\n"
+            f"(현재 부채: {new_loan_total:,}원, 현금: {new_money:,}원)"
+        )
 
     @commands.command(name="대출상환", aliases=["상환"])
     async def repay_loan(self, ctx, amount: str):

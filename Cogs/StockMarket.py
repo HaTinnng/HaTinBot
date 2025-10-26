@@ -9,6 +9,7 @@ import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.font_manager as fm
+from urllib.parse import urlparse
 
 # ===== 상수 설정 =====
 JOIN_BONUS = 750000         # 참가 시 지급 자금 (750,000원)
@@ -19,6 +20,28 @@ MONGO_URI = os.environ.get("MONGODB_URI")
 DB_NAME = "stock_game"
 
 plt.rcParams["axes.unicode_minus"] = False
+
+# ===== 전역 약어 맵 (정식 '이름'을 키로 사용) =====
+ALIAS_MAP = {
+    "311유통":    ["311", "유통"],
+    "썬더타이어": ["썬더", "타이어"],
+    "룡치수산":   ["룡치", "수산"],
+    "맥턴맥주":   ["맥턴", "맥주"],
+    "섹보경아트": ["섹보", "아트"],
+    "전차자동차": ["전차", "자동차"],
+    "이리여행사": ["이리", "여행"],
+    "디코커피":   ["디코", "커피"],
+    "와이제이엔터": ["와이제이", "엔터"],
+    "파피게임사": ["파피", "게임"],
+    "하틴봇전자": ["하틴봇", "전자"],
+    "하틴출판사": ["하틴출", "출판"],
+    "창훈버거":   ["창훈", "버거"],
+    "끼룩제약":   ["끼룩", "제약"],
+    "날틀식품":   ["날틀", "식품"],
+    "백만통신":   ["백만", "통신"],
+    "베스트보험": ["베스트", "보험"],
+    "후니마트":   ["후니", "마트"],
+}
 
 # ===== DB에 저장할 주식 초기화 함수 =====
 def init_stocks():
@@ -213,35 +236,10 @@ def init_stocks():
         "history": [],
     }
 
-    # 각 종목의 history에 최초 가격 추가
+    # 각 종목의 history 및 aliases 세팅
     for s in stocks.values():
         s["history"].append(s["price"])
-        s.setdefault("aliases", [])
-
-    # ==== 수동 약어(정확 매칭만 지원) 지정 ====
-    # 원하는 약어들을 아래 딕셔너리에 추가/수정하면 됩니다.
-    alias_map = {
-        "1":  ["311", "유통"],
-        "2":  ["썬더", "타이어"],
-        "3":  ["룡치", "수산"],
-        "4":  ["맥턴", "맥주"],
-        "5":  ["섹보", "아트"],
-        "6":  ["전차", "자동차"],
-        "7":  ["이리", "여행"],
-        "8":  ["디코", "커피"],
-        "9":  ["와이제이", "엔터"],
-        "10": ["파피", "게임"],
-        "11": ["하틴봇", "전자"],
-        "12": ["하틴출", "출판"],
-        "13": ["창훈", "버거"],
-        "14": ["끼룩", "제약"],
-        "15": ["날틀", "식품"],
-        "16": ["백만", "통신"],
-        "17": ["베스트", "보험"],
-        "18": ["후니", "마트"],
-    }
-    for sid, s in stocks.items():
-        s["aliases"] = alias_map.get(sid, s["aliases"])
+        s["aliases"] = ALIAS_MAP.get(s["name"], [])
 
     return stocks
 
@@ -288,7 +286,7 @@ class StockBurnConfirmView(discord.ui.View):
             await interaction.response.send_message("이 명령어를 실행한 사용자가 아닙니다.", ephemeral=True)
             return
         self.value = True
-        self.stop()
+               self.stop()
         await interaction.response.send_message("주식 소각을 진행합니다.", ephemeral=True)
 
     @discord.ui.button(label="아니요", style=discord.ButtonStyle.secondary)
@@ -302,9 +300,19 @@ class StockBurnConfirmView(discord.ui.View):
 
 class StockMarket(commands.Cog):
     def __init__(self, bot):
+        # ---- MongoDB 연결 및 진단 로그 ----
+        if not MONGO_URI:
+            raise RuntimeError("MONGODB_URI 환경변수가 설정되지 않았습니다.")
+        parsed = urlparse(MONGO_URI)
+        print(f"[MongoDB] connecting host={parsed.hostname}, scheme={parsed.scheme}")
+
         self.bot = bot
-        # MongoDB 연결 (환경변수 MONGODB_URI 사용)
-        self.mongo_client = MongoClient(MONGO_URI)
+        try:
+            self.mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=8000)
+            self.mongo_client.admin.command("ping")
+        except Exception as e:
+            raise RuntimeError(f"MongoDB 연결 실패: {e}")
+
         self.db = self.mongo_client[DB_NAME]
         self.last_interest_day = None  # 마지막으로 이자가 적용된 날짜 (YYYY-MM-DD)
         self.bank_interest_loop.start()
@@ -329,7 +337,7 @@ class StockMarket(commands.Cog):
             }
             self.db.season.insert_one(season_doc)
 
-        # stocks 컬렉션 초기화 (문서가 없으면)
+        # stocks 컬렉션 초기화 (문서가 없으면 생성)
         if self.db.stocks.count_documents({}) == 0:
             stocks = init_stocks()
             for stock in stocks.values():
@@ -337,6 +345,9 @@ class StockMarket(commands.Cog):
 
         # (마이그레이션) 기존 문서에 aliases 필드 없으면 추가
         self.db.stocks.update_many({"aliases": {"$exists": False}}, {"$set": {"aliases": []}})
+        # (중요) 기존 DB 문서에도 전역 ALIAS_MAP을 강제 동기화
+        for name, aliases in ALIAS_MAP.items():
+            self.db.stocks.update_one({"name": name}, {"$set": {"aliases": aliases}})
 
         # 내부 상태
         self.prev_stock_order = {}
@@ -1175,7 +1186,7 @@ class StockMarket(commands.Cog):
             "percent_change": 0,
             "listed": True,
             "history": [],
-            "aliases": []
+            "aliases": ALIAS_MAP.get(stock_name, [])
         }
         new_stock["history"].append(new_stock["price"])
         self.db.stocks.insert_one(new_stock)
@@ -1397,7 +1408,6 @@ class StockMarket(commands.Cog):
                 await ctx.send("기록된 시즌 결과 목록:\n" + "\n".join(lines))
             else:
                 items_per_page = 10
-                total_pages = (len(seasons) + items_per_page - 1) // items_per_page
 
                 class SeasonResultsView(discord.ui.View):
                     def __init__(self, seasons, items_per_page, current_page=0):
@@ -1648,25 +1658,32 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="다음시즌")
     async def next_season(self, ctx):
+        """
+        #다음시즌:
+        현재 진행 중인 시즌이 아닌, 다음에 진행될 시즌에 대한 정보를 출력합니다.
+        (시즌 기간은 매월 1일 0시 10분부터 28일 0시 10분까지로 설정)
+        """
         now = self.get_seoul_time()
         tz = pytz.timezone("Asia/Seoul")
-
+        
+        # 다음 시즌은 항상 현재 달의 시즌이 끝난 후, 즉 다음 달 1일 0시 10분에 시작합니다.
         if now.month == 12:
             next_year = now.year + 1
             next_month = 1
         else:
             next_year = now.year
             next_month = now.month + 1
-
+        
         next_season_start = tz.localize(datetime(next_year, next_month, 1, 0, 10, 0))
         next_season_end = tz.localize(datetime(next_year, next_month, 28, 0, 10, 0))
-
+        
+        # 남은 시간을 계산합니다.
         remaining = next_season_start - now
         days = remaining.days
         hours, rem = divmod(remaining.seconds, 3600)
         minutes, seconds = divmod(rem, 60)
         remaining_str = f"{days}일 {hours}시간 {minutes}분 {seconds}초"
-
+        
         await ctx.send(
             f"**다음 시즌 정보**\n"
             f"시즌 기간: {next_season_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {next_season_end.strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -1675,8 +1692,14 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="주식소각", aliases=["소각"])
     async def burn_stock(self, ctx, stock_name: str = None, amount: str = None):
+        """
+        #주식소각 [주식명] [수량]:
+        보유 중인 주식을 환급 없이 소각합니다.
+        예시: `#주식소각 썬더타이어 10`
+            `#주식소각 맥턴맥주 all`
+        """
         if stock_name is None or amount is None:
-            await ctx.send("사용법: `#주식소각 주식명/약어 수량` (예: `#주식소각 썬더 10`)")
+            await ctx.send("사용법: `#주식소각 주식명 수량` (예: `#주식소각 썬더타이어 10`)")
             return
 
         user_id = str(ctx.author.id)
@@ -1685,9 +1708,10 @@ class StockMarket(commands.Cog):
             await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가` 명령어로 참가해주세요.")
             return
 
-        stock, err = self.find_stock_by_alias_or_name(stock_name)
-        if err:
-            await ctx.send(err)
+        # 주식 종목 존재 여부 확인 (주식명으로 DB 조회)
+        stock = self.db.stocks.find_one({"name": stock_name})
+        if not stock:
+            await ctx.send("존재하지 않는 주식 종목입니다.")
             return
 
         portfolio = user.get("portfolio", {})
@@ -1696,6 +1720,7 @@ class StockMarket(commands.Cog):
             return
 
         current_amount = portfolio[stock["_id"]].get("amount", 0)
+        # 'all', '전부', '다' 등의 토큰 입력 시 전량 소각
         if amount.lower() in ["all", "전부", "올인", "다", "풀소각"]:
             burn_amount = current_amount
         else:
@@ -1712,10 +1737,11 @@ class StockMarket(commands.Cog):
             await ctx.send("소각할 주식 수량이 보유 수량보다 많습니다.")
             return
 
-        view = StockBurnConfirmView(ctx.author, stock["name"], burn_amount)
+        # 경고 메시지와 함께 확인 버튼 표시
+        view = StockBurnConfirmView(ctx.author, stock_name, burn_amount)
         await ctx.send(
             f"⚠️ **주식 소각 확인**\n"
-            f"소각할 주식: **{stock['name']}**\n"
+            f"소각할 주식: **{stock_name}**\n"
             f"소각할 수량: **{burn_amount:,}주**\n"
             f"※ 소각 시 보유 주식은 환급되지 않습니다.\n"
             f"계속 진행하시겠습니까?",
@@ -1726,16 +1752,18 @@ class StockMarket(commands.Cog):
             await ctx.send("주식 소각이 취소되었습니다.")
             return
 
+        # 소각 진행: 소유 주식 수량에서 burn_amount만큼 차감
         remaining = current_amount - burn_amount
         if remaining > 0:
+            # 평균 구매 단가에 비례하여 total_cost도 갱신 (비례 배분)
             avg_price = portfolio[stock["_id"]].get("total_cost", 0) / current_amount
             new_total_cost = int(avg_price * remaining)
             portfolio[stock["_id"]] = {"amount": remaining, "total_cost": new_total_cost}
         else:
-            portfolio.pop(stock["_id"])
+         portfolio.pop(stock["_id"])
 
         self.db.users.update_one({"_id": user_id}, {"$set": {"portfolio": portfolio}})
-        await ctx.send(f"{ctx.author.mention}님, **{stock['name']}** 주식 {burn_amount:,.0f}주가 소각되었습니다. (남은 보유량: {remaining:,.0f}주)")
-
+        await ctx.send(f"{ctx.author.mention}님, **{stock_name}** 주식 {burn_amount:,.0f}주가 소각되었습니다. (남은 보유량: {remaining:,.0f}주)")
+        
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

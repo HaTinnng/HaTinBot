@@ -1053,7 +1053,7 @@ class StockMarket(commands.Cog):
     
             # 최근 5개만 표시(−4 ~ 0), 첫 점의 변동률 계산을 위해 −5 값 보관
             if len(history_full) >= 6:
-                prev_for_first = history_full[-6]  # −5 지점
+                prev_for_first = history_full[-6]
             else:
                 prev_for_first = None
             history = history_full[-5:]  # (−4, −3, −2, −1, 0)
@@ -1074,7 +1074,7 @@ class StockMarket(commands.Cog):
             # 그래프 생성
             plt.figure(figsize=(6, 4))
             ax = plt.gca()
-            ax.plot(range(len(history)), history, marker="o", linestyle="-", linewidth=2)
+            ax.plot(range(len(history)), history, marker="o", linestyle="-", linewidth=2, color="royalblue")
     
             ax.set_title(f"{stock['name']} 변동 내역", fontsize=16, fontweight="bold")
             ax.set_xlabel("측정 횟수", fontsize=12)
@@ -1085,7 +1085,7 @@ class StockMarket(commands.Cog):
             ax.set_xticks(range(len(history)))
             ax.set_xticklabels([-4, -3, -2, -1, 0][-len(history):])
     
-            # Y축 범위 및 눈금(최대/최소 포함 보장)
+            # ✅ Y축은 Matplotlib이 자동으로 계산하도록 (최대/최소 강제 추가 제거)
             y_min = min(history)
             y_max = max(history)
             pad = max(1, int((y_max - y_min) * 0.05))
@@ -1093,13 +1093,8 @@ class StockMarket(commands.Cog):
             y_top = y_max + pad
             ax.set_ylim(y_bottom, y_top)
     
+            # ✅ ticks 자동 계산 (강제 추가 X)
             ticks = plt.MaxNLocator(nbins=6).tick_values(y_bottom, y_top)
-            ticks = list(ticks)  # 타입 통일
-            if y_min not in ticks:
-                ticks.append(y_min)
-            if y_max not in ticks:
-                ticks.append(y_max)
-            ticks = sorted(set(ticks))
             ax.set_yticks(ticks)
             ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:,.0f}"))
     
@@ -1138,7 +1133,6 @@ class StockMarket(commands.Cog):
                 plt.close()
             except Exception:
                 pass
-
 
     @commands.command(name="주식완전초기화")
     @commands.is_owner()

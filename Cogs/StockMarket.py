@@ -1040,6 +1040,7 @@ class StockMarket(commands.Cog):
         status_msg = await ctx.send("📈 그래프를 생성 중입니다... 잠시만 기다려주세요.")
     
         try:
+            # 약어/정식명 매칭
             stock, err = self.find_stock_by_alias_or_name(stock_name)
             if err:
                 await status_msg.edit(content=err)
@@ -1050,14 +1051,14 @@ class StockMarket(commands.Cog):
                 await status_msg.edit(content="해당 주식의 변동 내역이 없습니다.")
                 return
     
-            # 최근 5개 표시 (−4 ~ 0), 첫 점 계산용으로 이전값 보존
+            # 최근 5개만 표시(−4 ~ 0), 첫 점의 변동률 계산을 위해 −5 값 보관
             if len(history_full) >= 6:
-                prev_for_first = history_full[-6]
+                prev_for_first = history_full[-6]  # −5 지점
             else:
                 prev_for_first = None
-            history = history_full[-5:]
+            history = history_full[-5:]  # (−4, −3, −2, −1, 0)
     
-            # 폰트 설정
+            # 폰트 설정(있으면 사용)
             font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", "온글잎 나나양.ttf")
             custom_font = "sans-serif"
             if os.path.exists(font_path):
@@ -1073,19 +1074,18 @@ class StockMarket(commands.Cog):
             # 그래프 생성
             plt.figure(figsize=(6, 4))
             ax = plt.gca()
-            ax.plot(range(len(history)), history, marker="o", linestyle="-", linewidth=2, color="royalblue")
+            ax.plot(range(len(history)), history, marker="o", linestyle="-", linewidth=2)
     
             ax.set_title(f"{stock['name']} 변동 내역", fontsize=16, fontweight="bold")
             ax.set_xlabel("측정 횟수", fontsize=12)
             ax.set_ylabel("주가 (원)", fontsize=12)
             ax.grid(True, alpha=0.3)
     
-            # X축: -4 ~ 0 고정
-            xlabels_full = [-4, -3, -2, -1, 0]
+            # X축: -4 ~ 0 고정(데이터 길이에 맞춰 앞쪽 절단)
             ax.set_xticks(range(len(history)))
-            ax.set_xticklabels(xlabels_full[-len(history):])
+            ax.set_xticklabels([-4, -3, -2, -1, 0][-len(history):])
     
-            # Y축 범위 및 눈금 자동 계산 (최대/최소 포함)
+            # Y축 범위 및 눈금(최대/최소 포함 보장)
             y_min = min(history)
             y_max = max(history)
             pad = max(1, int((y_max - y_min) * 0.05))
@@ -1094,20 +1094,18 @@ class StockMarket(commands.Cog):
             ax.set_ylim(y_bottom, y_top)
     
             ticks = plt.MaxNLocator(nbins=6).tick_values(y_bottom, y_top)
+            ticks = list(ticks)  # 타입 통일
             if y_min not in ticks:
-                ticks = sorted(set(ticks.tolist() + [y_min]))
+                ticks.append(y_min)
             if y_max not in ticks:
-                ticks = sorted(set(ticks.tolist() + [y_max]))
+                ticks.append(y_max)
+            ticks = sorted(set(ticks))
             ax.set_yticks(ticks)
             ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:,.0f}"))
     
-            # 각 점에 가격(+변동률) 표시
+            # 각 점 라벨: 가격(+직전 대비 변동률)
             for i, price in enumerate(history):
-                if i == 0:
-                    prev = prev_for_first
-                else:
-                    prev = history[i - 1]
-    
+                prev = history[i - 1] if i > 0 else prev_for_first
                 if prev and prev > 0:
                     pct = (price / prev - 1) * 100
                     label = f"{price:,} ({pct:+.2f}%)"
@@ -1140,6 +1138,7 @@ class StockMarket(commands.Cog):
                 plt.close()
             except Exception:
                 pass
+
 
     @commands.command(name="주식완전초기화")
     @commands.is_owner()

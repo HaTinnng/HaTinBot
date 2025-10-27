@@ -1764,18 +1764,13 @@ class StockMarket(commands.Cog):
         await ctx.send(f"{ctx.author.mention}님, **{stock_name}** 주식 {burn_amount:,.0f}주가 소각되었습니다. (남은 보유량: {remaining:,.0f}주)")
 
     @commands.command(name="시장그래프", aliases=["전체그래프", "종목그래프"])
-    async def market_graph(self, ctx, mode: str = "변동률"):
+    async def market_graph(self, ctx):
         """
-        #시장그래프 [모드]:
-        모든 종목의 최근 추세를 한 그래프에 표시합니다.
-        - 기본: 변동률(정규화) 기준으로 그림 (첫 값=100으로 환산)
-        - '원본' 입력 시 원본 가격 기준으로 그림
-        - 변동률 모드에서는 세로축에 % 단위 숫자 표시
-        - 생성 중 상태 메시지를 표시합니다.
-        예) #시장그래프            -> 변동률(정규화)
-            #시장그래프 원본       -> 원본 가격 기준
+        #시장그래프:
+        모든 종목의 최근 변동률을 ±20% 범위로 시각화합니다.
+        가운데 0%를 기준선으로 하며, 축 단위는 5% 간격으로 구분됩니다.
         """
-        status_msg = await ctx.send("📊 시장 그래프 생성 중...")
+        status_msg = await ctx.send("📊 변동률 기반 시장 그래프 생성 중...")
 
         try:
             stocks = list(self.db.stocks.find({}).sort("_id", 1))
@@ -1783,7 +1778,7 @@ class StockMarket(commands.Cog):
                 await status_msg.edit(content="📉 현재 등록된 주식이 없습니다.")
                 return
 
-            # 폰트(선택)
+            # 한글 폰트 설정
             try:
                 font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", "온글잎 나나양.ttf")
                 if os.path.exists(font_path):
@@ -1793,86 +1788,81 @@ class StockMarket(commands.Cog):
             except Exception:
                 pass
             plt.rcParams["axes.unicode_minus"] = False
-
-            normalize = mode.lower() not in ["원본", "raw", "original"]
-
+    
             plt.figure(figsize=(8, 5))
             ax = plt.gca()
-
+    
             line_styles = ["-", "--", "-.", ":"]
             style_idx = 0
             plotted_any = False
             max_len = 0
-
-            def xtick_labels(n):
-                return list(range(-n + 1, 1))
-
+    
             for stock in stocks:
                 history = stock.get("history", [])
-                if not history or all(v == 0 for v in history):
+                if len(history) < 2 or all(v == 0 for v in history):
                     continue
-
-                y_values = history
-                if normalize:
-                    first = history[0]
-                    if first is None or first <= 0:
-                        continue
-                    y_values = [(v / first) * 100.0 for v in history]
-
+    
+                first = history[0]
+                if first <= 0:
+                    continue
+    
+                # 첫 값 대비 변동률(%) 계산
+                changes = [((v / first) - 1) * 100 for v in history]
+    
                 ls = line_styles[style_idx % len(line_styles)]
                 style_idx += 1
-
+    
                 ax.plot(
-                    range(len(y_values)),
-                    y_values,
+                    range(len(changes)),
+                    changes,
                     linestyle=ls,
                     marker=None,
                     linewidth=2,
                     label=stock.get("name", "Unknown"),
                 )
-                max_len = max(max_len, len(y_values))
+                max_len = max(max_len, len(changes))
                 plotted_any = True
-
+    
             if not plotted_any:
                 await status_msg.edit(content="⚠️ 그릴 데이터가 없습니다. (모든 종목의 기록이 비어있거나 정규화 불가)")
                 plt.close()
                 return
-
-            # X축 설정
+    
+            # X축 라벨: -n+1 ~ 0
             ax.set_xticks(list(range(max_len)))
-            ax.set_xticklabels(xtick_labels(max_len))
-
-            # 제목/레이아웃
-            if normalize:
-                ax.set_title("전체 종목 최근 추세 — 변동률 기준 (첫 값=100%)", fontsize=14, fontweight="bold")
-                ax.set_ylabel("변동률 (%)")  # ← 퍼센트 표시
-            else:
-                ax.set_title("전체 종목 최근 추세 — 원본 가격 기준", fontsize=14, fontweight="bold")
-                ax.set_ylabel("가격")
-
-            ax.set_xlabel("측정 간격(최근=0)")
+            ax.set_xticklabels(list(range(-max_len + 1, 1)))
+    
+            # Y축 설정: -20 ~ +20, 5단위
+            ax.set_ylim(-20, 20)
+            ax.set_yticks(range(-20, 25, 5))
+            ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%d%%"))
+    
+            # 0% 기준선
+            ax.axhline(0, color="gray", linewidth=1.5, linestyle="-")
+    
+            # 제목 및 라벨
+            ax.set_title("전체 종목 변동률 추세 (±20% 범위)", fontsize=14, fontweight="bold")
+            ax.set_xlabel("측정 간격 (최근=0)")
+            ax.set_ylabel("변동률 (%)")
             ax.grid(True, alpha=0.3)
-
-            # 범례(바깥쪽)
+    
+            # 범례
             ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0., fontsize=9)
             plt.tight_layout()
-
-            # 이미지로 전송
+    
+            # 이미지 출력
             buf = io.BytesIO()
             plt.savefig(buf, format="png", bbox_inches="tight")
             buf.seek(0)
             plt.close()
-
-            file = discord.File(fp=buf, filename="market_overview.png")
+    
+            file = discord.File(fp=buf, filename="market_range_graph.png")
             await ctx.send(file=file)
-            await status_msg.edit(content="✅ 시장 그래프 생성 완료")
-
+            await status_msg.edit(content="✅ 시장 변동률 그래프 생성 완료")
+    
         except Exception as e:
             await status_msg.edit(content=f"❌ 시장 그래프 생성 중 오류가 발생했습니다: {e}")
-            try:
-                plt.close()
-            except Exception:
-                pass
-      
+            plt.close()
+
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

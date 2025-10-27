@@ -455,7 +455,7 @@ class StockMarket(commands.Cog):
             }
             history = stock.get("history", [])
             history.append(new_price)
-            history = history[-5:]
+            history = history[-6:]
             update_fields["history"] = history
 
             self.db.stocks.update_one({"_id": stock["_id"]}, {"$set": update_fields})

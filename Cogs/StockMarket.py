@@ -1032,31 +1032,32 @@ class StockMarket(commands.Cog):
 
     @commands.command(name="변동내역")
     async def price_history(self, ctx, stock_name: str):
-            # 시즌 중에만 사용(기존 로직 유지)
-            if not self.is_trading_open():
-                await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
-                return
+        # 시즌 중에만 사용
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 명령어는 거래 가능 시간에만 사용할 수 있습니다.")
+            return
     
-            # 약어/정식명 매칭
+        status_msg = await ctx.send("📈 그래프를 생성 중입니다... 잠시만 기다려주세요.")
+    
+        try:
             stock, err = self.find_stock_by_alias_or_name(stock_name)
             if err:
-                await ctx.send(err)
+                await status_msg.edit(content=err)
                 return
     
             history_full = stock.get("history", [])
             if not history_full:
-                await ctx.send("해당 주식의 변동 내역이 없습니다.")
+                await status_msg.edit(content="해당 주식의 변동 내역이 없습니다.")
                 return
     
-            # ── 최근 5개만 표시(−4 ~ 0), 단 첫 점의 변동률 계산을 위해 이전 값(−5)을 활용 ──
+            # 최근 5개 표시 (−4 ~ 0), 첫 점 계산용으로 이전값 보존
             if len(history_full) >= 6:
-                prev_for_first = history_full[-6]  # −5 지점
+                prev_for_first = history_full[-6]
             else:
                 prev_for_first = None
+            history = history_full[-5:]
     
-            history = history_full[-5:]  # 그래프에 표시할 구간 (−4, −3, −2, −1, 0)
-    
-            # 폰트 로드(기존과 동일)
+            # 폰트 설정
             font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", "온글잎 나나양.ttf")
             custom_font = "sans-serif"
             if os.path.exists(font_path):
@@ -1069,37 +1070,41 @@ class StockMarket(commands.Cog):
             plt.rcParams["font.family"] = custom_font
             plt.rcParams["axes.unicode_minus"] = False
     
-            # ── 플롯 ──
+            # 그래프 생성
             plt.figure(figsize=(6, 4))
             ax = plt.gca()
-            ax.plot(range(len(history)), history, marker='o', linestyle='-', linewidth=2)
+            ax.plot(range(len(history)), history, marker="o", linestyle="-", linewidth=2, color="royalblue")
     
             ax.set_title(f"{stock['name']} 변동 내역", fontsize=16, fontweight="bold")
             ax.set_xlabel("측정 횟수", fontsize=12)
             ax.set_ylabel("주가 (원)", fontsize=12)
             ax.grid(True, alpha=0.3)
     
-            # X축 라벨 고정: −4 ~ 0 (표시 개수에 맞춰 앞쪽을 잘라 적용)
+            # X축: -4 ~ 0 고정
             xlabels_full = [-4, -3, -2, -1, 0]
             ax.set_xticks(range(len(history)))
             ax.set_xticklabels(xlabels_full[-len(history):])
     
-            # ── y축 최저/최고 주가 표시 ──
+            # Y축 범위 및 눈금 자동 계산 (최대/최소 포함)
             y_min = min(history)
             y_max = max(history)
-            # 여백을 약간 줘서 텍스트가 잘리지 않도록
-            pad = max(1, int((y_max - y_min) * 0.08))
-            ax.set_ylim(y_min - pad, y_max + pad)
+            pad = max(1, int((y_max - y_min) * 0.05))
+            y_bottom = y_min - pad
+            y_top = y_max + pad
+            ax.set_ylim(y_bottom, y_top)
     
-            # 축 내부 좌측에 최저/최고 텍스트 표기
-            ax.text(0.01, y_max, f"최고: {y_max:,}원", va="bottom", ha="left", fontsize=10)
-            ax.text(0.01, y_min, f"최저: {y_min:,}원", va="top", ha="left", fontsize=10)
+            ticks = plt.MaxNLocator(nbins=6).tick_values(y_bottom, y_top)
+            if y_min not in ticks:
+                ticks = sorted(set(ticks.tolist() + [y_min]))
+            if y_max not in ticks:
+                ticks = sorted(set(ticks.tolist() + [y_max]))
+            ax.set_yticks(ticks)
+            ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:,.0f}"))
     
-            # ── 각 점 라벨: 가격(직전 대비 변동률) ──
+            # 각 점에 가격(+변동률) 표시
             for i, price in enumerate(history):
-                # 직전 대비 기준값 계산
                 if i == 0:
-                    prev = prev_for_first  # −4의 직전은 −5 (있을 때만)
+                    prev = prev_for_first
                 else:
                     prev = history[i - 1]
     
@@ -1116,10 +1121,10 @@ class StockMarket(commands.Cog):
                     textcoords="offset points",
                     ha="left",
                     va="center",
-                    fontsize=10
+                    fontsize=10,
                 )
     
-            # 이미지로 전송
+            # 이미지 전송
             buf = io.BytesIO()
             plt.savefig(buf, format="png", bbox_inches="tight")
             buf.seek(0)
@@ -1127,6 +1132,14 @@ class StockMarket(commands.Cog):
     
             file = discord.File(fp=buf, filename="price_history.png")
             await ctx.send(file=file)
+            await status_msg.edit(content="✅ 그래프 생성이 완료되었습니다!")
+    
+        except Exception as e:
+            await status_msg.edit(content=f"❌ 그래프 생성 중 오류가 발생했습니다: {e}")
+            try:
+                plt.close()
+            except Exception:
+                pass
 
     @commands.command(name="주식완전초기화")
     @commands.is_owner()

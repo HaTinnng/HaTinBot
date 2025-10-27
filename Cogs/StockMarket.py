@@ -1415,97 +1415,113 @@ class StockMarket(commands.Cog):
             )
             await ctx.send(f"유저 `{target}`에게 '{title}' 칭호가 부여되었습니다.")
 
-    @commands.command(name="시즌결과")
+   @commands.command(name="시즌결과")
     async def season_results(self, ctx, *, season_name: str = None):
+        """
+        #시즌결과 [시즌명?]
+        - 시즌명을 주면 해당 시즌의 TOP3를 보여줍니다.
+        - 시즌명을 생략하면 기록된 모든 시즌을 페이지(10개/페이지)로 3버튼 UI(이전/표시/다음)로 탐색합니다.
+        """
+        # 1) 단일 시즌 조회 모드
         if season_name is not None:
             season_doc = self.db.season_results.find_one({"season_name": season_name})
             if not season_doc:
                 await ctx.send(f"'{season_name}' 시즌 결과를 찾을 수 없습니다.")
                 return
+    
             results = season_doc.get("results", [])
-            if not results:
-                await ctx.send(f"'{season_name}' 시즌 결과가 없습니다.")
-                return
             lines = [
-                f"**{season_name} 시즌 TOP3 결과**",
-                f"기간: {season_doc.get('start_time', 'N/A')} ~ {season_doc.get('end_time', 'N/A')}"
+                f"**{season_doc['season_name']} 시즌 TOP3**",
+                f"기간: {season_doc.get('start_time', 'N/A')} ~ {season_doc.get('end_time', 'N/A')}",
             ]
-            for entry in results:
-                lines.append(f"{entry['rank']}위: {entry['username']} - {entry['total_assets']:,}원")
-            await ctx.send("\n".join(lines))
-        else:
-            seasons = list(self.db.season_results.find({}))
-            if not seasons:
-                await ctx.send("아직 기록된 시즌 결과가 없습니다.")
-                return
-
-            seasons.sort(key=lambda doc: doc["season_name"])
-
-            if len(seasons) < 10:
-                lines = [
-                    f"{doc['season_name']}: {doc.get('start_time', 'N/A')} ~ {doc.get('end_time', 'N/A')}"
-                    for doc in seasons
-                ]
-                await ctx.send("기록된 시즌 결과 목록:\n" + "\n".join(lines))
+            if results:
+                for entry in results:
+                    lines.append(f"{entry['rank']}위: {entry['username']} - {entry['total_assets']:,}원")
             else:
-                items_per_page = 10
-
-                class SeasonResultsView(discord.ui.View):
-                    def __init__(self, seasons, items_per_page, current_page=0):
-                        super().__init__(timeout=60)
-                        self.seasons = seasons
-                        self.items_per_page = items_per_page
-                        self.current_page = current_page
-                        self.total_pages = (len(seasons) + items_per_page - 1) // items_per_page
-                        self.update_buttons()
-
-                    def update_buttons(self):
-                        self.clear_items()
-                        self.add_item(PrevButton(self))
-                        self.add_item(discord.ui.Button(label=f"{self.current_page+1}/{self.total_pages}", style=discord.ButtonStyle.secondary, disabled=True))
-                        self.add_item(NextButton(self))
-
-                    def get_page_content(self):
-                        start = self.current_page * self.items_per_page
-                        end = start + self.items_per_page
-                        page_seasons = self.seasons[start:end]
-                        lines = [
-                            f"{idx+1}. {doc['season_name']}: {doc.get('start_time', 'N/A')} ~ {doc.get('end_time', 'N/A')}"
-                            for idx, doc in enumerate(page_seasons, start=start)
-                        ]
-                        return "\n".join(lines)
-
-                class PrevButton(discord.ui.Button):
-                    def __init__(self, view_obj):
-                        super().__init__(label="이전", style=discord.ButtonStyle.primary)
-                        self.view_obj = view_obj
-
-                    async def callback(self, interaction: discord.Interaction):
-                        if self.view_obj.current_page <= 0:
-                            await interaction.response.send_message("첫번째 페이지입니다.", ephemeral=True)
-                        else:
-                            self.view_obj.current_page -= 1
-                            self.view_obj.update_buttons()
-                            content = self.view_obj.get_page_content()
-                            await interaction.response.edit_message(content=content, view=self.view_obj)
-
-                class NextButton(discord.ui.Button):
-                    def __init__(self, view_obj):
-                        super().__init__(label="다음", style=discord.ButtonStyle.primary)
-                        self.view_obj = view_obj
-
-                    async def callback(self, interaction: discord.Interaction):
-                        if self.view_obj.current_page >= self.view_obj.total_pages - 1:
-                            await interaction.response.send_message("마지막 페이지입니다.", ephemeral=True)
-                        else:
-                            self.view_obj.current_page += 1
-                            self.view_obj.update_buttons()
-                            content = self.view_obj.get_page_content()
-                            await interaction.response.edit_message(content=content, view=self.view_obj)
-
-                view = SeasonResultsView(seasons, items_per_page)
-                content = view.get_page_content()
-                await ctx.send(content, view=view)
+                lines.append("TOP3 기록이 없습니다.")
+            await ctx.send("\n".join(lines))
+            return
+    
+        # 2) 목록 페이지네이션 모드
+        seasons = list(self.db.season_results.find({}))
+        if not seasons:
+            await ctx.send("아직 기록된 시즌 결과가 없습니다.")
+            return
+    
+        # 정렬(시즌명 오름차순; 필요시 시간 기준으로 바꿔도 됨)
+        seasons.sort(key=lambda doc: doc["season_name"])
+    
+        ITEMS_PER_PAGE = 10
+        total_pages = (len(seasons) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+    
+        class SeasonPager(discord.ui.View):
+            def __init__(self, seasons, per_page):
+                super().__init__(timeout=90)
+                self.seasons = seasons
+                self.per_page = per_page
+                self.page = 0  # 0-indexed
+                self.total_pages = (len(seasons) + per_page - 1) // per_page
+                # 미리 버튼을 3개만 배치
+                self.prev_btn = PrevButton(self)
+                self.page_btn = PageIndicatorButton(self)
+                self.next_btn = NextButton(self)
+                self.add_item(self.prev_btn)
+                self.add_item(self.page_btn)   # disabled indicator
+                self.add_item(self.next_btn)
+    
+            def page_text(self) -> str:
+                start = self.page * self.per_page
+                end = start + self.per_page
+                chunk = self.seasons[start:end]
+                lines = [
+                    f"**기록된 시즌 결과 목록** (총 {len(self.seasons)}개) — 페이지 {self.page+1}/{self.total_pages}",
+                    ""
+                ]
+                for i, doc in enumerate(chunk, start=start + 1):
+                    lines.append(f"{i}. {doc['season_name']}: {doc.get('start_time', 'N/A')} ~ {doc.get('end_time', 'N/A')}")
+                return "\n".join(lines)
+    
+        class PageIndicatorButton(discord.ui.Button):
+            def __init__(self, pager: SeasonPager):
+                super().__init__(label=f"{pager.page+1}/{pager.total_pages}",
+                                 style=discord.ButtonStyle.secondary, disabled=True)
+                self.pager = pager
+    
+            async def refresh(self, interaction: discord.Interaction):
+                # 버튼 라벨 업데이트
+                self.label = f"{self.pager.page+1}/{self.pager.total_pages}"
+                await interaction.response.edit_message(content=self.pager.page_text(), view=self.pager)
+    
+        class PrevButton(discord.ui.Button):
+            def __init__(self, pager: SeasonPager):
+                super().__init__(label="이전", style=discord.ButtonStyle.primary)
+                self.pager = pager
+    
+            async def callback(self, interaction: discord.Interaction):
+                if self.pager.page <= 0:
+                    await interaction.response.send_message("첫번째 페이지입니다.", ephemeral=True)
+                    return
+                self.pager.page -= 1
+                # 가운데 버튼 라벨 갱신
+                self.pager.page_btn.label = f"{self.pager.page+1}/{self.pager.total_pages}"
+                await interaction.response.edit_message(content=self.pager.page_text(), view=self.pager)
+    
+        class NextButton(discord.ui.Button):
+            def __init__(self, pager: SeasonPager):
+                super().__init__(label="다음", style=discord.ButtonStyle.primary)
+                self.pager = pager
+    
+            async def callback(self, interaction: discord.Interaction):
+                if self.pager.page >= self.pager.total_pages - 1:
+                    await interaction.response.send_message("마지막 페이지입니다.", ephemeral=True)
+                    return
+                self.pager.page += 1
+                # 가운데 버튼 라벨 갱신
+                self.pager.page_btn.label = f"{self.pager.page+1}/{self.pager.total_pages}"
+                await interaction.response.edit_message(content=self.pager.page_text(), view=self.pager)
+    
+        view = SeasonPager(seasons, ITEMS_PER_PAGE)
+        await ctx.send(view.page_text(), view=view)
 
     @commands.command(name="예금")
     async def deposit(self, ctx, amount: str):

@@ -1415,7 +1415,7 @@ class StockMarket(commands.Cog):
             )
             await ctx.send(f"유저 `{target}`에게 '{title}' 칭호가 부여되었습니다.")
 
-   @commands.command(name="시즌결과")
+    @commands.command(name="시즌결과")
     async def season_results(self, ctx, *, season_name: str = None):
         """
         #시즌결과 [시즌명?]

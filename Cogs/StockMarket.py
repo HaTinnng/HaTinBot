@@ -1764,21 +1764,43 @@ class StockMarket(commands.Cog):
         await ctx.send(f"{ctx.author.mention}님, **{stock_name}** 주식 {burn_amount:,.0f}주가 소각되었습니다. (남은 보유량: {remaining:,.0f}주)")
 
     @commands.command(name="시장그래프", aliases=["전체그래프", "종목그래프"])
-    async def market_graph(self, ctx):
+    async def market_graph(self, ctx, *names: str):
         """
-        #시장그래프:
-        모든 종목의 최근 변동률을 ±20% 범위로 시각화합니다.
-        가운데 0%를 기준선으로 하며, 축 단위는 5% 간격으로 구분됩니다.
+        #시장그래프 [종목명 ...]
+        - 인자가 없으면: 전체 종목
+        - 인자가 있으면: 지정한 종목(약어/정식명)만 (N개 가능)
+        - 중앙 0%, 범위 -20%~+20%, 5% 간격 눈금
         """
         status_msg = await ctx.send("📊 변동률 기반 시장 그래프 생성 중...")
-
+    
         try:
-            stocks = list(self.db.stocks.find({}).sort("_id", 1))
-            if not stocks:
-                await status_msg.edit(content="📉 현재 등록된 주식이 없습니다.")
+            # --- 그릴 대상 종목 집합 만들기 ---
+            target_stocks = []
+            not_found = []
+    
+            if names:
+                # 입력한 각 토큰을 약어/정식명 '정확 매칭'으로 해석
+                seen_ids = set()
+                for key in names:
+                    stock, err = self.find_stock_by_alias_or_name(key)
+                    if err or not stock:
+                        not_found.append(key)
+                        continue
+                    if stock["_id"] not in seen_ids:
+                        target_stocks.append(stock)
+                        seen_ids.add(stock["_id"])
+            else:
+                # 전체 종목
+                target_stocks = list(self.db.stocks.find({}).sort("_id", 1))
+    
+            if not target_stocks:
+                msg = "📉 그릴 종목이 없습니다."
+                if not_found:
+                    msg += f" (인식 실패: {', '.join(f'`{x}`' for x in not_found[:10])})"
+                await status_msg.edit(content=msg)
                 return
-
-            # 한글 폰트 설정
+    
+            # --- 폰트(선택) ---
             try:
                 font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", "온글잎 나나양.ttf")
                 if os.path.exists(font_path):
@@ -1789,6 +1811,7 @@ class StockMarket(commands.Cog):
                 pass
             plt.rcParams["axes.unicode_minus"] = False
     
+            # --- 플롯 ---
             plt.figure(figsize=(8, 5))
             ax = plt.gca()
     
@@ -1797,16 +1820,16 @@ class StockMarket(commands.Cog):
             plotted_any = False
             max_len = 0
     
-            for stock in stocks:
+            for stock in target_stocks:
                 history = stock.get("history", [])
+                # 최소 2개 이상이어야 추세가 의미 있음
                 if len(history) < 2 or all(v == 0 for v in history):
                     continue
-    
                 first = history[0]
-                if first <= 0:
+                if first is None or first <= 0:
                     continue
     
-                # 첫 값 대비 변동률(%) 계산
+                # 첫 값 대비 변동률(%)
                 changes = [((v / first) - 1) * 100 for v in history]
     
                 ls = line_styles[style_idx % len(line_styles)]
@@ -1824,15 +1847,18 @@ class StockMarket(commands.Cog):
                 plotted_any = True
     
             if not plotted_any:
-                await status_msg.edit(content="⚠️ 그릴 데이터가 없습니다. (모든 종목의 기록이 비어있거나 정규화 불가)")
+                msg = "⚠️ 그릴 데이터가 없습니다. (모든 대상 종목의 기록이 비었거나 변환 불가)"
+                if not_found:
+                    msg += f"\n인식 실패: {', '.join(f'`{x}`' for x in not_found[:10])}"
+                await status_msg.edit(content=msg)
                 plt.close()
                 return
     
-            # X축 라벨: -n+1 ~ 0
+            # X축: -n+1 ~ 0
             ax.set_xticks(list(range(max_len)))
             ax.set_xticklabels(list(range(-max_len + 1, 1)))
     
-            # Y축 설정: -20 ~ +20, 5단위
+            # Y축: -20 ~ +20, 5 단위
             ax.set_ylim(-20, 20)
             ax.set_yticks(range(-20, 25, 5))
             ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%d%%"))
@@ -1840,17 +1866,23 @@ class StockMarket(commands.Cog):
             # 0% 기준선
             ax.axhline(0, color="gray", linewidth=1.5, linestyle="-")
     
-            # 제목 및 라벨
-            ax.set_title("전체 종목 변동률 추세 (±20% 범위)", fontsize=14, fontweight="bold")
+            # 제목/라벨
+            if names:
+                title_list = [s.get("name", "Unknown") for s in target_stocks[:5]]
+                extra = "" if len(target_stocks) <= 5 else f" 외 {len(target_stocks) - 5}개"
+                ax.set_title(f"선택 종목 변동률 추세 (±20%) — {', '.join(title_list)}{extra}", fontsize=14, fontweight="bold")
+            else:
+                ax.set_title("전체 종목 변동률 추세 (±20%)", fontsize=14, fontweight="bold")
+    
             ax.set_xlabel("측정 간격 (최근=0)")
             ax.set_ylabel("변동률 (%)")
             ax.grid(True, alpha=0.3)
     
-            # 범례
+            # 범례 (바깥)
             ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0., fontsize=9)
             plt.tight_layout()
     
-            # 이미지 출력
+            # 이미지 전송
             buf = io.BytesIO()
             plt.savefig(buf, format="png", bbox_inches="tight")
             buf.seek(0)
@@ -1858,11 +1890,21 @@ class StockMarket(commands.Cog):
     
             file = discord.File(fp=buf, filename="market_range_graph.png")
             await ctx.send(file=file)
-            await status_msg.edit(content="✅ 시장 변동률 그래프 생성 완료")
+    
+            # 상태 메시지 마무리
+            if not_found:
+                await status_msg.edit(
+                    content=f"✅ 그래프 생성 완료 (인식 실패: {', '.join(f'`{x}`' for x in not_found[:10])})"
+                )
+            else:
+                await status_msg.edit(content="✅ 그래프 생성 완료")
     
         except Exception as e:
             await status_msg.edit(content=f"❌ 시장 그래프 생성 중 오류가 발생했습니다: {e}")
-            plt.close()
+            try:
+                plt.close()
+            except Exception:
+                pass
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

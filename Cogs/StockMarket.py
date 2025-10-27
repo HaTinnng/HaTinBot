@@ -1825,8 +1825,7 @@ class StockMarket(commands.Cog):
                 history = stock.get("history", [])
                 if len(history) < 2 or all(v == 0 for v in history):
                     continue
-    
-                # 각 구간별 변동률 계산 (누적 X)
+            
                 step_changes = [0.0]
                 for i in range(1, len(history)):
                     prev = history[i - 1]
@@ -1837,21 +1836,28 @@ class StockMarket(commands.Cog):
                         pct = (curr / prev - 1) * 100
                         pct = max(-20, min(20, pct))  # ±20% 클램프
                         step_changes.append(pct)
-    
+            
+                # ✅ 마지막 5개만 시각화 (-4 ~ 0 구간)
+                if len(step_changes) > 5:
+                    step_changes = step_changes[-5:]
+            
                 ls = line_styles[style_idx % len(line_styles)]
                 style_idx += 1
-    
+            
                 ax.plot(
                     range(len(step_changes)),
                     step_changes,
                     linestyle=ls,
-                    marker=None,
                     linewidth=2,
                     label=stock.get("name", "Unknown"),
                 )
                 max_len = max(max_len, len(step_changes))
                 plotted_any = True
-    
+            
+            # ✅ X축 라벨을 -4 ~ 0으로 고정
+            ax.set_xticks(range(5))
+            ax.set_xticklabels([-4, -3, -2, -1, 0])
+
             if not plotted_any:
                 msg = "⚠️ 그릴 데이터가 없습니다. (대상 종목 기록이 비었거나 변환 불가)"
                 if not_found:

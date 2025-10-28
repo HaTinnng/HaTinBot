@@ -220,42 +220,60 @@ class CloverFit5x3(commands.Cog):
         if run["spins_left"] <= 0:
             await ctx.send("이번 라운드에서 더 이상 스핀할 수 없습니다. ATM 목표를 채우지 못했다면 탈락 위험!")
             return
-
+    
         # Roll final grid
         final_grid = self._roll_grid()
-        # Make initial message with full placeholders
+    
+        # Initial rendering (all hidden)
         render0 = self._render_grid(final_grid, reveal_cols=0)
-        msg = await ctx.send(f"```
-{render0}
-```\n🎞️ 스핀 중…")
-
+        content0 = (
+            "```\n"
+            f"{render0}\n"
+            "```\n"
+            "🎞️ 스핀 중…"
+        )
+        msg = await ctx.send(content0)
+    
         # Animate reveal columns 1..5
         for col in range(1, GRID_W+1):
             await asyncio.sleep(0.25)
             render = self._render_grid(final_grid, reveal_cols=col)
-            await msg.edit(content=f"```
-{render}
-```\n🎞️ 스핀 중… {col}/{GRID_W}")
-
+            content = (
+                "```\n"
+                f"{render}\n"
+                "```\n"
+                f"🎞️ 스핀 중… {col}/{GRID_W}"
+            )
+            await msg.edit(content=content)
+    
         # Score
         reward, logs = self._score_grid(final_grid)
         self.users.update_one({"_id": uid}, {"$inc": {"coins": reward}})
         self.runs.update_one({"_id": run["_id"]}, {"$inc": {"spins_left": -1}})
-        run = self._current_run(uid)  # refresh
-
+        run = self._current_run(uid)
+    
         if logs:
             detail = "\n".join(f"• {x}" for x in logs)
         else:
             detail = "• 당첨 없음"
-        await msg.edit(content=f"```
-{self._render_grid(final_grid, reveal_cols=None)}
-```\n💰 수익: **{reward:,}** (보유 {u.get('coins',0)+reward:,})\n{detail}\n남은 스핀: {run['spins_left']}")
-
-        # If no spins left AND quota not met, you bust
-        run = self._current_run(uid)
+    
+        u = self._ensure_user(uid)  # Refresh user coins
+        final_content = (
+            "```\n"
+            f"{self._render_grid(final_grid, reveal_cols=None)}\n"
+            "```\n"
+            f"💰 수익: **{reward:,}** (보유 {u.get('coins',0):,})\n"
+            f"{detail}\n"
+            f"남은 스핀: {run['spins_left']}"
+        )
+        await msg.edit(content=final_content)
+    
+        # If no spins left AND quota not met → game over
         if run and run["spins_left"] == 0 and run["bank"] < run["quota"]:
-            self.runs.update_one({"_id": run["_id"]}, {"$set": {"status": "dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}})
-            await ctx.send("💀 스핀 기회 소진. 목표 미달성으로 탈락했습니다. `#클로버5시작`으로 재도전!")
+            self.runs.update_one({"_id": run["_id"]}, {
+                "$set": {"status": "dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}
+            })
+            await ctx.send("💀 스핀 기회 소진. 목표 미달성으로 탈락했습니다. `#클로버시작`으로 재도전!")
 
     @commands.command(name="클로버입금")
     async def deposit(self, ctx, amount:str=None):

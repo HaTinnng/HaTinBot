@@ -1,3 +1,4 @@
+# CloverFit5x3.py
 import os, random, asyncio
 from datetime import datetime
 import pytz
@@ -55,10 +56,14 @@ class CloverFit5x3(commands.Cog):
         self.users = self.db["clover5_users"]
         self.runs  = self.db["clover5_runs"]
 
+        # 유예 타이머(60초) 관리: user_id -> asyncio.Task
+        self.grace_tasks = {}
+
+    # ── Helpers ─────────────────────────────────────────────────────────────
     def _ensure_user(self, uid:str):
         doc = self.users.find_one({"_id": uid})
         if not doc:
-            doc = {"_id": uid, "coins": 0, "charms": {}}
+            doc = {"_id": uid, "coins": 0, "charms": {}, "nickname": None}
             self.users.insert_one(doc)
         return doc
 
@@ -136,7 +141,6 @@ class CloverFit5x3(commands.Cog):
                 c = j
 
         # Diagonals length 3 (↘ and ↙) in sliding windows of width 3
-        # Starting columns: 0..(GRID_W-3), rows: 0..(GRID_H-3) -> but H=3 so row=0 only
         for sc in range(GRID_W - 2):
             # ↘ : (0,sc) (1,sc+1) (2,sc+2)
             a,b,c = grid[0][sc], grid[1][sc+1], grid[2][sc+2]
@@ -154,17 +158,15 @@ class CloverFit5x3(commands.Cog):
                 logs.append(f"대각선↙ 3연속 {a} +{gain:,}")
 
         # Triangles (▲/▼) within any 3-column window: columns [w, w+1, w+2]
-        # ▲ uses rows (0 as apex, 1 as base): positions: (0,w+1),(1,w),(1,w+2)
-        # ▼ uses rows (1 as apex, 0 as base): positions: (1,w+1),(0,w),(0,w+2)
         for w in range(GRID_W - 2):
-            # ▲ top triangle
+            # ▲ top triangle: (0,w+1),(1,w),(1,w+2)
             a,b,c = grid[0][w+1], grid[1][w], grid[1][w+2]
             if a == b == c:
                 base = self._symbol_base(a)
                 gain = int(base * TRIANGLE_3X * BET_UNIT)
                 total += gain
                 logs.append(f"삼각형▲ {a} +{gain:,}")
-            # ▼ bottom triangle
+            # ▼ bottom triangle: (1,w+1),(0,w),(0,w+2)
             a,b,c = grid[1][w+1], grid[0][w], grid[0][w+2]
             if a == b == c:
                 base = self._symbol_base(a)
@@ -174,31 +176,71 @@ class CloverFit5x3(commands.Cog):
 
         return total, logs
 
+    # Grace timer helpers
+    def _cancel_grace(self, uid:str):
+        """해당 유저의 유예 타이머가 있으면 취소하고 삭제"""
+        task = self.grace_tasks.pop(uid, None)
+        if task and not task.done():
+            task.cancel()
+
+    def _start_grace_timer(self, uid:str, channel:discord.abc.Messageable, run_id:str):
+        """60초 유예 타이머 시작: quota 미달이면 자동 탈락"""
+        # 기존 타이머가 있으면 새로 시작하기 전에 취소
+        self._cancel_grace(uid)
+
+        async def worker():
+            try:
+                await channel.send(
+                    "🕒 스핀을 모두 사용했습니다. **60초 안에** `#클로버입금 [금액|all]`으로 ATM 목표를 채우면 다음 라운드로 넘어갈 수 있어요.\n"
+                    "⏳ 60초 후에도 목표 미달이면 자동 탈락합니다."
+                )
+                await asyncio.sleep(60)
+                # 종료 시점 재검사
+                r = self._current_run(uid)
+                if not r or r.get("_id") != run_id:  # 런이 바뀌었거나 종료됨
+                    return
+                if r.get("status") != "playing":
+                    return
+                if r.get("bank", 0) >= r.get("quota", 0):
+                    return  # 이미 quota 달성
+                # 자동 탈락 처리
+                self.runs.update_one({"_id": run_id}, {
+                    "$set": {"status": "dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}
+                })
+                await channel.send("⏰ 시간이 초과되었습니다. 목표 미달성으로 **탈락**했습니다. `#클로버시작`으로 재도전하세요.")
+            except asyncio.CancelledError:
+                # 정상 취소(입금 성공/종료 등) 시 조용히 종료
+                pass
+            finally:
+                # 정리
+                self.grace_tasks.pop(uid, None)
+
+        self.grace_tasks[uid] = asyncio.create_task(worker())
+
     # ── Commands ─────────────────────────────────────────────────────────────
     @commands.command(name="클로버참가")
     async def join(self, ctx, *, nickname: str = None):
         uid = str(ctx.author.id)
         u = self._ensure_user(uid)
-    
-        def invalid_name(msg="올바른 닉네임을 입력하세요. (최대 8글자, 공백 없이)"):
-            return ctx.send(msg + "\n사용법: `#클로버참가 닉네임`")
-    
+
+        async def invalid_name(msg="올바른 닉네임을 입력하세요. (최대 8글자, 공백 없이)"):
+            await ctx.send(msg + "\n사용법: `#클로버참가 닉네임`")
+
         # 최초 참가인데 닉네임 미입력 → 안내
         if not u.get("nickname") and not nickname:
             await invalid_name("닉네임이 필요합니다.")
             return
-    
+
         # 닉네임이 들어온 경우 검증 및 저장
         if nickname is not None:
             n = nickname.strip()
-            # 공백만 있거나, 공백 포함, 8글자 초과 → 거절
             if not n or any(ch.isspace() for ch in n) or len(n) > 8:
                 await invalid_name("올바르지 않은 닉네임입니다.")
                 return
             # 저장
             self.users.update_one({"_id": uid}, {"$set": {"nickname": n}})
             u["nickname"] = n
-    
+
         await ctx.send(
             f"{ctx.author.mention} 클로버핏(5x3) 준비 완료!\n"
             f"닉네임: **{u.get('nickname')}** | 보유 코인: {u.get('coins',0):,}"
@@ -225,12 +267,14 @@ class CloverFit5x3(commands.Cog):
         run = self._current_run(uid)
         if run:
             await ctx.send(
-                f"🏷️ 보유 코인: {u.get('coins',0):,}\n"
+                f"🏷️ 닉네임: {u.get('nickname') or '-'}\n"
+                f"보유 코인: {u.get('coins',0):,}\n"
                 f"▶️ 진행중: 라운드 {run['round']} | 목표 {run['quota']:,} | ATM {run['bank']:,} | 남은 스핀 {run['spins_left']}"
             )
         else:
             await ctx.send(
-                f"🏷️ 보유 코인: {u.get('coins',0):,}\n진행중인 런 없음. `#클로버시작`으로 시작하세요."
+                f"🏷️ 닉네임: {u.get('nickname') or '-'}\n"
+                f"보유 코인: {u.get('coins',0):,}\n진행중인 런 없음. `#클로버시작`으로 시작하세요."
             )
 
     @commands.command(name="클로버스핀")
@@ -242,13 +286,13 @@ class CloverFit5x3(commands.Cog):
             await ctx.send("진행중인 런이 없습니다. `#클로버시작`으로 시작하세요.")
             return
         if run["spins_left"] <= 0:
-            await ctx.send("이번 라운드에서 더 이상 스핀할 수 없습니다. ATM 목표를 채우지 못했다면 탈락 위험!")
+            await ctx.send("이번 라운드에서 더 이상 스핀할 수 없습니다. ATM 목표를 채우지 못했다면 `#클로버입금`을 사용하세요.")
             return
-    
+
         # Roll final grid
         final_grid = self._roll_grid()
-    
-        # Initial rendering (all hidden)
+
+        # Initial rendering (all hidden) — backticks 분리
         render0 = self._render_grid(final_grid, reveal_cols=0)
         content0 = (
             "```\n"
@@ -257,7 +301,7 @@ class CloverFit5x3(commands.Cog):
             "🎞️ 스핀 중…"
         )
         msg = await ctx.send(content0)
-    
+
         # Animate reveal columns 1..5
         for col in range(1, GRID_W+1):
             await asyncio.sleep(0.25)
@@ -269,19 +313,20 @@ class CloverFit5x3(commands.Cog):
                 f"🎞️ 스핀 중… {col}/{GRID_W}"
             )
             await msg.edit(content=content)
-    
+
         # Score
         reward, logs = self._score_grid(final_grid)
         self.users.update_one({"_id": uid}, {"$inc": {"coins": reward}})
         self.runs.update_one({"_id": run["_id"]}, {"$inc": {"spins_left": -1}})
-        run = self._current_run(uid)
-    
+        run = self._current_run(uid)  # refresh
+
         if logs:
             detail = "\n".join(f"• {x}" for x in logs)
         else:
             detail = "• 당첨 없음"
-    
-        u = self._ensure_user(uid)  # Refresh user coins
+
+        # refresh user coins for display
+        u = self._ensure_user(uid)
         final_content = (
             "```\n"
             f"{self._render_grid(final_grid, reveal_cols=None)}\n"
@@ -291,13 +336,14 @@ class CloverFit5x3(commands.Cog):
             f"남은 스핀: {run['spins_left']}"
         )
         await msg.edit(content=final_content)
-    
-        # If no spins left AND quota not met → game over
-        if run and run["spins_left"] == 0 and run["bank"] < run["quota"]:
-            self.runs.update_one({"_id": run["_id"]}, {
-                "$set": {"status": "dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}
-            })
-            await ctx.send("💀 스핀 기회 소진. 목표 미달성으로 탈락했습니다. `#클로버시작`으로 재도전!")
+
+        # 유예 타이머 로직: 스핀을 모두 사용했다면 60초 유예
+        run = self._current_run(uid)
+        if run and run["spins_left"] == 0:
+            if run["bank"] < run["quota"]:
+                self._start_grace_timer(uid, ctx.channel, run["_id"])
+            else:
+                await ctx.send("🎯 목표 달성 상태입니다. `#클로버입금`으로 정산하면 다음 라운드가 시작됩니다.")
 
     @commands.command(name="클로버입금")
     async def deposit(self, ctx, amount:str=None):
@@ -330,8 +376,12 @@ class CloverFit5x3(commands.Cog):
         self.runs.update_one({"_id": run["_id"]}, {"$set": {"bank": new_bank}})
 
         msg_lines = [f"🏦 입금 완료: {pay:,} (ATM {new_bank:,}/{run['quota']:,})"]
-        # Quota met -> next round
+
+        # Quota met -> next round + 유예 타이머 취소
         if new_bank >= run["quota"]:
+            # 유예 타이머 취소
+            self._cancel_grace(uid)
+
             next_round = run["round"] + 1
             next_quota = ROUND_BASE_QUOTA + (next_round-1) * ROUND_QUOTA_STEP
             self.runs.update_one({"_id": run["_id"]}, {"$set": {
@@ -341,6 +391,12 @@ class CloverFit5x3(commands.Cog):
                 "spins_left": SPINS_PER_ROUND,
             }})
             msg_lines.append(f"🎯 목표 달성! → 라운드 {next_round} 시작 (새 목표 {next_quota:,}, 스핀 {SPINS_PER_ROUND}회 갱신)")
+        else:
+            # 아직 미달이면, 스핀이 0인 상태에서 계속 유예 중일 수 있음
+            fresh = self._current_run(uid)
+            if fresh and fresh["spins_left"] == 0 and uid not in self.grace_tasks:
+                self._start_grace_timer(uid, ctx.channel, fresh["_id"])
+
         await ctx.send("\n".join(msg_lines))
 
     @commands.command(name="클로버종료")
@@ -350,35 +406,33 @@ class CloverFit5x3(commands.Cog):
         if not run:
             await ctx.send("진행중인 런이 없습니다.")
             return
+
+        # 유예 타이머 취소
+        self._cancel_grace(uid)
+
         self.runs.update_one({"_id": run["_id"]}, {"$set": {"status":"dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}})
         await ctx.send(f"🛑 런을 종료했습니다. (라운드 {run['round']}, ATM {run['bank']:,})")
 
     @commands.command(name="클로버랭킹")
     async def rank(self, ctx):
         pipeline = [
-            {"$match": {"status": {"$in": ["playing", "dead", "cleared"]}}},
-            {"$group": {"_id": "$user_id", "best_round": {"$max": "$round"}, "max_bank": {"$max": "$bank"}}},
+            {"$match": {"status": {"$in":["playing","dead","cleared"]}}},
+            {"$group": {"_id":"$user_id", "best_round":{"$max":"$round"}, "max_bank":{"$max":"$bank"}}},
             {"$sort": {"best_round": -1, "max_bank": -1}},
-            {"$limit": 10},
+            {"$limit": 10}
         ]
         tops = list(self.runs.aggregate(pipeline))
         if not tops:
             await ctx.send("랭킹 데이터가 없습니다.")
             return
-    
         lines = ["🏆 클로버핏 5x3 랭킹 TOP10"]
-        for i, row in enumerate(tops, start=1):
+        for i,row in enumerate(tops, start=1):
             uid = row["_id"]
-            # 닉네임 우선, 없으면 길드 표시명
             udoc = self.users.find_one({"_id": uid}, {"nickname": 1})
-            nickname = udoc.get("nickname") if udoc else None
+            nickname = (udoc or {}).get("nickname")
             member = ctx.guild.get_member(int(uid)) if ctx.guild else None
             display = nickname or (member.display_name if member else uid)
-    
-            lines.append(
-                f"{i}. {display} — 최고 라운드 {row['best_round']} / ATM최대 {row['max_bank']:,}"
-            )
-    
+            lines.append(f"{i}. {display} — 최고 라운드 {row['best_round']} / ATM최대 {row['max_bank']:,}")
         await ctx.send("\n".join(lines))
 
 async def setup(bot):

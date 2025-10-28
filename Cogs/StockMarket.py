@@ -1062,27 +1062,30 @@ class StockMarket(commands.Cog):
                 .sort([("settled_at", -1), ("_id", -1)]).limit(5)
             )
 
-            # ---- 진행 중 베팅 금액(자산 차감) ----
-            total_locked_bet = sum(
-                int(b.get("stake", 0)) + int(b.get("fee", 0)) for b in open_bets
-            )
+            # 진행 중 베팅 금액(자산에서 차감)
+            total_locked_bet = sum(int(b.get("stake", 0)) + int(b.get("fee", 0)) for b in open_bets)
 
-            # ---- 전체 자산 계산 ----
+            # 전체 자산 계산
             total_assets = cash + bank + total_stock_value - loan_amount - total_locked_bet
 
-            titles_str = ", ".join(user.get("titles", [])) if user.get("titles", []) else "없음"
+            titles = user.get("titles", [])
+            titles_str = ", ".join(titles) if titles else "없음"
             username = user.get("username", ctx.author.display_name)
 
             # ---- 진행 중 베팅 섹션 ----
             if open_bets:
-                open_lines = [
-                    f"- {b.get('stock_name', '?')} {b.get('direction','?').upper()} | "
-                    f"베팅 {int(b.get('stake',0)):,}원 + 수수료 {int(b.get('fee',0)):,}원 | "
-                    f"정산: {b.get('settle_at','?')}"
-                    for b in open_bets[:5]
-                ]
+                open_lines = []
+                for b in open_bets[:5]:
+                    sname = b.get("stock_name", "?")
+                    direction = b.get("direction", "?").upper()
+                    stake = int(b.get("stake", 0))
+                    fee = int(b.get("fee", 0))
+                    settle_at = b.get("settle_at", "?")
+                    open_lines.append(
+                        f"- {sname} {direction} | 베팅 {stake:,}원 + 수수료 {fee:,}원 | 정산: {settle_at}"
+                    )
                 if len(open_bets) > 5:
-                    open_lines.append(f"... 외 {len(open_bets)-5}건")
+                    open_lines.append(f"... 외 {len(open_bets) - 5}건")
                 open_block = "\n".join(open_lines)
             else:
                 open_block = "없음"
@@ -1096,10 +1099,10 @@ class StockMarket(commands.Cog):
                     stake = int(b.get("stake", 0))
                     fee = int(b.get("fee", 0))
                     payout = int(b.get("payout", 0))
-                    result = b.get("result", "?")
-                    movement = b.get("movement", "-")
+                    result = b.get("result", "?")  # win/push/lose
+                    movement = b.get("movement", "-")  # up/down/flat
                     net = payout - stake - fee
-                    
+
                     if result == "win":
                         badge = "🎯 적중"
                     elif result == "push":
@@ -1114,38 +1117,44 @@ class StockMarket(commands.Cog):
             else:
                 recent_block = "기록 없음"
 
-            # ---- ANSI 출력 ----
+            # ---- 출력(요청 레이아웃) ----
             lines = []
             header = f"\u001b[1;37;48;5;27m {username}님의 프로필 \u001b[0m"
             lines.append(header)
             lines.append("")
+            # 자산 요약
             lines.append(f"현금 잔액 : {cash:,}원")
             lines.append(f"은행 예금 : {bank:,}원")
             lines.append(f"대출 금액 : {loan_amount:,}원")
             lines.append(f"주식 총액 : {total_stock_value:,}원")
             lines.append(f"베팅 중 금액 : {total_locked_bet:,}원")
             lines.append(f"전체 자산 : {total_assets:,}원")
+
+            # 보유 주식
             lines.append("")
             lines.append("보유 주식:")
             lines.append(portfolio_str)
+
+            # 진행 중인 틱베팅
+            lines.append("")
+            lines.append("진행 중인 틱베팅")
+            lines.append(open_block)
+
+            # 최근 틱베팅 결과
+            lines.append("")
+            lines.append("최근 틱베팅 결과 (최신 5건)")
+            lines.append(recent_block)
+
+            # 칭호
             lines.append("")
             lines.append("칭호:")
             lines.append(titles_str)
-            lines.append("")
-            lines.append("\u001b[1m진행 중인 틱베팅\u001b[0m")
-            lines.append(open_block)
-            lines.append("")
-            lines.append("\u001b[1m최근 틱베팅 결과 (최신 5건)\u001b[0m")
-            lines.append(recent_block)
 
             ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
             await ctx.send(ansi_content)
 
         except Exception as e:
-            # ✅ 관리자 로그용 출력
             print(f"[ERROR] profile(): {e}")
-
-            # ✅ 유저에게 오류 전달
             await ctx.send(f"⚠️ 프로필을 불러오는 중 오류가 발생했습니다.\n오류 코드: `{type(e).__name__}: {e}`")
 
     @commands.command(name="변동내역")

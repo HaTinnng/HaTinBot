@@ -428,7 +428,7 @@ class StockMarket(commands.Cog):
         delta = next_time - now
         return next_time, delta
 
-        def _next_tick_time_rounded(self):
+    def _next_tick_time_rounded(self):
         """
         현재 시각 기준 '다음 틱(0/20/40분 00초)'의 절대 시각을 반환.
         settle_at에 저장할 포맷(문자열)도 함께 반환.

@@ -1127,7 +1127,7 @@ class StockMarket(commands.Cog):
             lines.append(f"은행 예금 : {bank:,}원")
             lines.append(f"대출 금액 : {loan_amount:,}원")
             lines.append(f"주식 총액 : {total_stock_value:,}원")
-            lines.append(f"베팅 중 금액 : {total_locked_bet:,}원")
+            lines.append(f"베팅 금액 : {total_locked_bet:,}원")
             lines.append(f"전체 자산 : {total_assets:,}원")
 
             # 보유 주식

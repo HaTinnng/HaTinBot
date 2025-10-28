@@ -176,9 +176,33 @@ class CloverFit5x3(commands.Cog):
 
     # ── Commands ─────────────────────────────────────────────────────────────
     @commands.command(name="클로버참가")
-    async def join(self, ctx):
-        u = self._ensure_user(str(ctx.author.id))
-        await ctx.send(f"{ctx.author.mention} 클로버핏(5x3) 준비 완료! 보유 코인: {u.get('coins',0):,}")
+    async def join(self, ctx, *, nickname: str = None):
+        uid = str(ctx.author.id)
+        u = self._ensure_user(uid)
+    
+        def invalid_name(msg="올바른 닉네임을 입력하세요. (최대 8글자, 공백 없이)"):
+            return ctx.send(msg + "\n사용법: `#클로버참가 닉네임`")
+    
+        # 최초 참가인데 닉네임 미입력 → 안내
+        if not u.get("nickname") and not nickname:
+            await invalid_name("닉네임이 필요합니다.")
+            return
+    
+        # 닉네임이 들어온 경우 검증 및 저장
+        if nickname is not None:
+            n = nickname.strip()
+            # 공백만 있거나, 공백 포함, 8글자 초과 → 거절
+            if not n or any(ch.isspace() for ch in n) or len(n) > 8:
+                await invalid_name("올바르지 않은 닉네임입니다.")
+                return
+            # 저장
+            self.users.update_one({"_id": uid}, {"$set": {"nickname": n}})
+            u["nickname"] = n
+    
+        await ctx.send(
+            f"{ctx.author.mention} 클로버핏(5x3) 준비 완료!\n"
+            f"닉네임: **{u.get('nickname')}** | 보유 코인: {u.get('coins',0):,}"
+        )
 
     @commands.command(name="클로버시작")
     async def start(self, ctx):
@@ -332,20 +356,29 @@ class CloverFit5x3(commands.Cog):
     @commands.command(name="클로버랭킹")
     async def rank(self, ctx):
         pipeline = [
-            {"$match": {"status": {"$in":["playing","dead","cleared"]}}},
-            {"$group": {"_id":"$user_id", "best_round":{"$max":"$round"}, "max_bank":{"$max":"$bank"}}},
+            {"$match": {"status": {"$in": ["playing", "dead", "cleared"]}}},
+            {"$group": {"_id": "$user_id", "best_round": {"$max": "$round"}, "max_bank": {"$max": "$bank"}}},
             {"$sort": {"best_round": -1, "max_bank": -1}},
-            {"$limit": 10}
+            {"$limit": 10},
         ]
         tops = list(self.runs.aggregate(pipeline))
         if not tops:
             await ctx.send("랭킹 데이터가 없습니다.")
             return
+    
         lines = ["🏆 클로버핏 5x3 랭킹 TOP10"]
-        for i,row in enumerate(tops, start=1):
-            user = ctx.guild.get_member(int(row["_id"]))
-            name = user.display_name if user else row["_id"]
-            lines.append(f"{i}. {name} — 최고 라운드 {row['best_round']} / ATM최대 {row['max_bank']:,}")
+        for i, row in enumerate(tops, start=1):
+            uid = row["_id"]
+            # 닉네임 우선, 없으면 길드 표시명
+            udoc = self.users.find_one({"_id": uid}, {"nickname": 1})
+            nickname = udoc.get("nickname") if udoc else None
+            member = ctx.guild.get_member(int(uid)) if ctx.guild else None
+            display = nickname or (member.display_name if member else uid)
+    
+            lines.append(
+                f"{i}. {display} — 최고 라운드 {row['best_round']} / ATM최대 {row['max_bank']:,}"
+            )
+    
         await ctx.send("\n".join(lines))
 
 async def setup(bot):

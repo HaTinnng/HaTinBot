@@ -1021,58 +1021,136 @@ class StockMarket(commands.Cog):
             f"{ctx.author.mention}님이 {stock['name']} 주식을 {sell_amount:,.0f}주 판매하여 {revenue:,.0f}원을 획득하였습니다. (현재 잔액: {new_money:,.0f}원)"
         )
 
-    @commands.command(name="프로필", aliases=["보관함", "자산", "자본"])
-    async def profile(self, ctx):
-        user_id = str(ctx.author.id)
-        user = self.db.users.find_one({"_id": user_id})
-        if not user:
-            await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
-            return
-
-        portfolio = user.get("portfolio", {})
-        total_stock_value = 0
-        portfolio_lines = []
-        for sid, holding in portfolio.items():
-            stock = self.db.stocks.find_one({"_id": sid})
-            if not stock:
-                continue
-            amount = holding.get("amount", 0)
-            current_price = stock.get("price", 0)
-            stock_value = current_price * amount
-            total_stock_value += stock_value
-            avg_buy = round(holding.get("total_cost", 0) / amount, 2) if amount > 0 else 0
-            portfolio_lines.append(
-                f"{stock.get('name', 'Unknown')}: {amount:,.0f}주 (현재가: {current_price:,}원, 총액: {stock_value:,.0f}원, 평균구매가: {avg_buy:,}원)"
+        @commands.command(name="프로필", aliases=["보관함", "자산", "자본"])
+        async def profile(self, ctx):
+            user_id = str(ctx.author.id)
+            user = self.db.users.find_one({"_id": user_id})
+            if not user:
+                await ctx.send("주식 게임에 참가하지 않으셨습니다. #주식참가 명령어로 참가해주세요.")
+                return
+    
+            # ---- 기본 자산 구성 ----
+            cash = user.get("money", DEFAULT_MONEY)
+            bank = user.get("bank", 0)
+            loan_amount = user.get("loan", {}).get("amount", 0)
+    
+            # ---- 주식 평가 ----
+            portfolio = user.get("portfolio", {})
+            total_stock_value = 0
+            portfolio_lines = []
+            for sid, holding in portfolio.items():
+                stock = self.db.stocks.find_one({"_id": sid})
+                if not stock:
+                    continue
+                amount = holding.get("amount", 0)
+                current_price = stock.get("price", 0)
+                stock_value = current_price * amount
+                total_stock_value += stock_value
+                avg_buy = round(holding.get("total_cost", 0) / amount, 2) if amount > 0 else 0
+                portfolio_lines.append(
+                    f"{stock.get('name', 'Unknown')}: {amount:,}주 (현재가: {current_price:,}원, 총액: {stock_value:,}원, 평균구매가: {avg_buy:,}원)"
+                )
+            portfolio_str = "\n".join(portfolio_lines) if portfolio_lines else "보유 주식 없음"
+    
+            # ---- 틱베팅 DB 조회 ----
+            open_bets = list(
+                self.db.tick_bets.find({"user_id": user_id, "status": "open"}).sort("settle_at", 1)
             )
-        portfolio_str = "\n".join(portfolio_lines) if portfolio_lines else "보유 주식 없음"
-
-        cash = user.get("money", DEFAULT_MONEY)
-        bank = user.get("bank", 0)
-        loan_amount = user.get("loan", {}).get("amount", 0)
-        total_assets = cash + bank + total_stock_value - loan_amount
-        titles_str = ", ".join(user.get("titles", [])) if user.get("titles", []) else "없음"
-        username = user.get("username", ctx.author.display_name)
-
-        lines = []
-        header = f"\u001b[1;37;48;5;27m {username}님의 프로필 \u001b[0m"
-        lines.append(header)
-        lines.append("")
-
-        lines.append(f"현금 잔액 : {cash:,.0f}원")
-        lines.append(f"은행 예금 : {bank:,.0f}원")
-        lines.append(f"대출 금액 : {loan_amount:,.0f}원")
-        lines.append(f"주식 총액 : {total_stock_value:,.0f}원")
-        lines.append(f"전체 자산 : {total_assets:,.0f}원")
-
-        lines.append("")
-        lines.append("보유 주식:")
-        lines.append(portfolio_str)
-        lines.append("")
-        lines.append("칭호:")
-        lines.append(titles_str)
-
-        ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
-        await ctx.send(ansi_content)
+            recent_bets = list(
+                self.db.tick_bets.find({"user_id": user_id, "status": "settled"})
+                .sort([("settled_at", -1), ("_id", -1)]).limit(5)
+            )
+    
+            # ✅ 진행 중 베팅 금액(자산에서 제외할 금액 합산)
+            total_locked_bet = sum(int(b.get("stake", 0)) + int(b.get("fee", 0)) for b in open_bets)
+    
+            # ✅ 전체 자산 계산 (베팅금 차감)
+            total_assets = cash + bank + total_stock_value - loan_amount - total_locked_bet
+    
+            titles_str = ", ".join(user.get("titles", [])) if user.get("titles", []) else "없음"
+            username = user.get("username", ctx.author.display_name)
+    
+            # ---- 진행 중 베팅 목록 ----
+            if open_bets:
+                open_lines = []
+                for b in open_bets[:5]:
+                    sname = b.get("stock_name", "?")
+                    direction = b.get("direction", "?").upper()
+                    stake = int(b.get("stake", 0))
+                    fee = int(b.get("fee", 0))
+                    settle_at = b.get("settle_at", "?")
+                    open_lines.append(
+                        f"- {sname} {direction} | 베팅 {stake:,}원 + 수수료 {fee:,}원 | 정산: {settle_at}"
+                    )
+                if len(open_bets) > 5:
+                    open_lines.append(f"... 외 {len(open_bets) - 5}건")
+                open_block = "\n".join(open_lines)
+            else:
+                open_block = "없음"
+    
+            # ---- 최근 정산 결과 ----
+            if recent_bets:
+                recent_lines = []
+                for b in recent_bets:
+                    sname = b.get("stock_name", "?")
+                    direction = b.get("direction", "?").upper()
+                    stake = int(b.get("stake", 0))
+                    fee = int(b.get("fee", 0))
+                    payout = int(b.get("payout", 0))
+                    result = b.get("result", "?")
+                    movement = b.get("movement", "-")
+                    settle_at = b.get("settle_at", "?")
+    
+                    net = payout - stake - fee  # ✅ 순이익
+    
+                    if result == "win":
+                        badge = "🎯 적중"
+                    elif result == "push":
+                        badge = "⚖️ 보합"
+                    else:
+                        badge = "❌ 실패"
+    
+                    recent_lines.append(
+                        f"- {badge} | {sname} {direction} | 실제: {movement} | 지급: {payout:,}원 | 순이익: {net:+,}원"
+                    )
+                recent_block = "\n".join(recent_lines)
+            else:
+                recent_block = "기록 없음"
+    
+            # ---- ANSI 출력 ----
+            lines = []
+            header = f"\u001b[1;37;48;5;27m {username}님의 프로필 \u001b[0m"
+            lines.append(header)
+            lines.append("")
+    
+            lines.append(f"현금 잔액 : {cash:,}원")
+            lines.append(f"은행 예금 : {bank:,}원")
+            lines.append(f"대출 금액 : {loan_amount:,}원")
+            lines.append(f"주식 총액 : {total_stock_value:,}원")
+    
+            # ✅ 표시 추가됨
+            lines.append(f"베팅 중 금액 : {total_locked_bet:,}원")
+    
+            lines.append(f"전체 자산 : {total_assets:,}원")
+    
+            lines.append("")
+            lines.append("보유 주식:")
+            lines.append(portfolio_str)
+    
+            lines.append("")
+            lines.append("칭호:")
+            lines.append(titles_str)
+    
+            lines.append("")
+            lines.append("\u001b[1m진행 중인 틱베팅\u001b[0m")
+            lines.append(open_block)
+    
+            lines.append("")
+            lines.append("\u001b[1m최근 틱베팅 결과 (최신 5건)\u001b[0m")
+            lines.append(recent_block)
+    
+            ansi_content = "```ansi\n" + "\n".join(lines) + "\n```"
+            await ctx.send(ansi_content)
 
     @commands.command(name="랭킹", aliases=["순위"])
     async def ranking_ansi(self, ctx):

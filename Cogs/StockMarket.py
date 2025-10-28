@@ -349,6 +349,12 @@ class StockMarket(commands.Cog):
         for name, aliases in ALIAS_MAP.items():
             self.db.stocks.update_one({"name": name}, {"$set": {"aliases": aliases}})
 
+        try:
+            self.db.tick_bets.create_index([("settle_at", 1), ("status", 1)])
+            self.db.tick_bets.create_index([("user_id", 1), ("status", 1)])
+        except Exception as e:
+            print(f"[tick_bets] create_index error: {e}")
+
         # 내부 상태
         self.prev_stock_order = {}
         self.last_update_min = None
@@ -422,6 +428,113 @@ class StockMarket(commands.Cog):
         delta = next_time - now
         return next_time, delta
 
+        def _next_tick_time_rounded(self):
+        """
+        현재 시각 기준 '다음 틱(0/20/40분 00초)'의 절대 시각을 반환.
+        settle_at에 저장할 포맷(문자열)도 함께 반환.
+        """
+        next_time, _ = self.get_next_update_info()  # 이미 구현되어 있음
+        # 초/마이크로초 정리
+        next_time = next_time.replace(second=0, microsecond=0)
+        return next_time, next_time.strftime("%Y-%m-%d %H:%M:%S")
+
+    async def settle_tick_bets(self, tick_dt: datetime):
+        """
+        tick_dt 시각(정확히 0/20/40분)에 대해 'open' 상태 베팅을 일괄 정산.
+        - 승리: stake * 1.92 지급
+        - 패배: 0
+        - 무승부(보합): 원금(stake)만 환불, 수수료는 환불 없음
+        - 모든 금액은 int로 처리(버림)
+        - 유저에게 DM 공지(실패해도 로그만)
+        """
+        tick_str = tick_dt.strftime("%Y-%m-%d %H:%M:%S")
+        open_bets = list(self.db.tick_bets.find({"settle_at": tick_str, "status": "open"}))
+        if not open_bets:
+            return
+
+        # 가격 비교를 위해 미리 해당 종목들 캐싱
+        stock_cache = {}
+        def get_move_dir(stock_id: str) -> str:
+            """
+            이 틱에서의 방향 판단: history[-2] vs history[-1]
+            return: "up" / "down" / "flat"
+            """
+            if stock_id not in stock_cache:
+                stock_cache[stock_id] = self.db.stocks.find_one({"_id": stock_id})
+            s = stock_cache[stock_id]
+            if not s:
+                return "flat"
+            hist = s.get("history", [])
+            if len(hist) < 2:
+                return "flat"
+            prev_price, curr_price = hist[-2], hist[-1]
+            if curr_price > prev_price:
+                return "up"
+            if curr_price < prev_price:
+                return "down"
+            return "flat"
+
+        for bet in open_bets:
+            try:
+                stock_id = bet["stock_id"]
+                user_id = bet["user_id"]
+                direction = bet["direction"]  # "up" or "down"
+                stake = int(bet["stake"])
+                fee = int(bet.get("fee", 0))
+
+                result_dir = get_move_dir(stock_id)
+
+                payout = 0
+                result = "lose"
+                note = ""
+
+                if result_dir == "flat":
+                    # 보합: 원금 환불(수수료는 환불 없음)
+                    payout = stake
+                    result = "push"
+                    note = "보합으로 원금 환불(수수료 제외)"
+                elif (result_dir == "up" and direction == "up") or (result_dir == "down" and direction == "down"):
+                    payout = int(stake * 1.92)  # 고정 배당배수
+                    result = "win"
+                else:
+                    payout = 0
+                    result = "lose"
+
+                # 유저 잔액 갱신(정산금 지급)
+                if payout > 0:
+                    self.db.users.update_one({"_id": user_id}, {"$inc": {"money": payout}})
+
+                # 베팅 문서 업데이트
+                self.db.tick_bets.update_one(
+                    {"_id": bet["_id"]},
+                    {"$set": {
+                        "status": "settled",
+                        "result": result,
+                        "payout": payout,
+                        "settled_at": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S"),
+                        "movement": result_dir,
+                        "note": note
+                    }}
+                )
+
+                # DM 통지(실패해도 무시)
+                try:
+                    user_obj = await self.bot.fetch_user(int(user_id))
+                    stock = stock_cache.get(stock_id)
+                    sname = stock.get("name", "Unknown") if stock else "Unknown"
+                    if result == "win":
+                        msg = f"🎉 [틱베팅 정산] {sname} {direction.upper()} 적중! 배당금 {payout:,}원 지급되었습니다."
+                    elif result == "push":
+                        msg = f"⚖️ [틱베팅 정산] {sname} 보합. 원금 {stake:,}원 환불(수수료 제외)되었습니다."
+                    else:
+                        msg = f"💤 [틱베팅 정산] {sname} {direction.upper()} 미적중. 배당금 없음."
+                    await user_obj.send(msg)
+                except Exception:
+                    pass
+
+            except Exception as e:
+                print(f"[tick_bets] settle error: {e}")
+
     def update_stocks(self):
         """
         모든 주식의 가격을 18.98% ~ -17.12% 변동폭 내에서 변동합니다.
@@ -486,6 +599,8 @@ class StockMarket(commands.Cog):
         if now.minute in [0, 20, 40]:
             if self.last_update_min != now.minute:
                 self.update_stocks()
+                tick_dt = now.replace(second=0, microsecond=0)
+                await self.settle_tick_bets(tick_dt)
                 self.last_update_min = now.minute
 
     @tasks.loop(minutes=1)
@@ -1976,6 +2091,123 @@ class StockMarket(commands.Cog):
                 plt.close()
             except Exception:
                 pass
+
+    @commands.command(name="틱베팅", aliases=["이벤트옵션","틱옵션","틱배팅"])
+    async def tick_bet(self, ctx, stock_name: str = None, direction: str = None, stake: str = None):
+        """
+        #틱베팅 [종목] [up|down|상승|하락] [금액]
+        - 다음 틱(0/20/40분) 결과를 예측하는 초단기 베팅
+        - 수수료 2% 즉시 부과, 적중 배당 1.92x (보합: 원금만 환불, 수수료 미환불)
+        - 같은 사용자/같은 settle_at에는 1건만 허용(스팸 방지)
+        """
+        if not self.is_trading_open():
+            await ctx.send("현재 시즌 종료 중입니다. 거래 가능 시간에만 이용할 수 있습니다.")
+            return
+
+        user_id = str(ctx.author.id)
+        user = self.db.users.find_one({"_id": user_id})
+        if not user:
+            await ctx.send("주식 게임에 참가하지 않으셨습니다. `#주식참가`로 먼저 등록해주세요.")
+            return
+
+        # 인자 체크
+        if not stock_name or not direction or not stake:
+            await ctx.send("사용법: `#틱베팅 [종목] [up|down|상승|하락] [금액]`")
+            return
+
+        # 방향 정규화
+        dir_map = {"up": "up", "down": "down", "상승": "up", "하락": "down"}
+        direction = direction.strip().lower()
+        if direction not in dir_map:
+            await ctx.send("방향은 `up/down(상승/하락)` 중 하나여야 합니다.")
+            return
+        direction = dir_map[direction]
+
+        # 종목 찾기(약어/정식명 정확매칭)
+        stock, err = self.find_stock_by_alias_or_name(stock_name)
+        if err:
+            await ctx.send(err)
+            return
+        if not stock.get("listed", True):
+            await ctx.send("해당 종목은 현재 거래할 수 없습니다.")
+            return
+
+        # 금액 파싱
+        try:
+            stake_val = int(stake.replace(",", ""))
+            if stake_val <= 0:
+                await ctx.send("베팅 금액은 1원 이상이어야 합니다.")
+                return
+        except Exception:
+            await ctx.send("베팅 금액을 올바르게 입력해주세요. 예) `#틱베팅 썬더 up 10000`")
+            return
+
+        # 다음 틱 시각
+        next_tick_dt, next_tick_str = self._next_tick_time_rounded()
+
+        # 같은 settle_at에 이미 본인 오픈 베팅 있으면 차단(쿨다운)
+        dup = self.db.tick_bets.find_one({
+            "user_id": user_id,
+            "settle_at": next_tick_str,
+            "status": "open"
+        })
+        if dup:
+            await ctx.send(f"이번 틱({next_tick_str})에는 이미 베팅이 있습니다.")
+            return
+
+        # 수수료 2%, 총 차감 = stake + fee
+        fee = int(stake_val * 0.02)
+        total_deduct = stake_val + fee
+        if user.get("money", 0) < total_deduct:
+            await ctx.send(f"잔액이 부족합니다. 필요 금액: {total_deduct:,}원 (베팅 {stake_val:,} + 수수료 {fee:,})")
+            return
+
+        # 차감 처리
+        self.db.users.update_one({"_id": user_id}, {"$inc": {"money": -total_deduct}})
+
+        # 베팅 문서 기록
+        bet_doc = {
+            "user_id": user_id,
+            "username": user.get("username", ctx.author.display_name),
+            "stock_id": stock["_id"],
+            "stock_name": stock.get("name", ""),
+            "direction": direction,           # "up" or "down"
+            "stake": int(stake_val),
+            "fee": int(fee),
+            "status": "open",                 # open -> settled
+            "created_at": self.get_seoul_time().strftime("%Y-%m-%d %H:%M:%S"),
+            "settle_at": next_tick_str        # 정산될 절대시각
+        }
+        self.db.tick_bets.insert_one(bet_doc)
+
+        await ctx.send(
+            f"{ctx.author.mention}님, **{stock['name']} {direction.upper()}** 틱베팅이 접수되었습니다.\n"
+            f"정산 시각: `{next_tick_str}`\n"
+            f"베팅액: {stake_val:,}원 / 수수료: {fee:,}원 / 총 차감: {total_deduct:,}원\n"
+            f"적중 배당: 베팅액 × 1.92, 보합: 원금만 환불(수수료 제외)"
+        )
+
+    @commands.command(name="틱베팅현황", aliases=["틱옵션현황","이벤트옵션현황"])
+    async def tick_bet_status(self, ctx):
+        """
+        내 'open' 상태의 틱베팅을 간단히 보여준다.
+        """
+        user_id = str(ctx.author.id)
+        bets = list(self.db.tick_bets.find({"user_id": user_id, "status": "open"}).sort("settle_at", 1))
+        if not bets:
+            await ctx.send("대기 중인 틱베팅이 없습니다.")
+            return
+
+        lines = ["**대기 중인 틱베팅**"]
+        for b in bets[:10]:
+            lines.append(
+                f"- {b.get('stock_name','?')} {b.get('direction','?').upper()} | "
+                f"베팅 {b.get('stake',0):,}원 (수수료 {b.get('fee',0):,}원) | 정산 {b.get('settle_at','?')}"
+            )
+        if len(bets) > 10:
+            lines.append(f"... 외 {len(bets)-10}건")
+
+        await ctx.send("\n".join(lines))
 
 async def setup(bot):
     await bot.add_cog(StockMarket(bot))

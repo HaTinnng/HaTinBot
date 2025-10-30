@@ -1,4 +1,4 @@
-# CloverFit5x3.py — CloverFit 규칙 반영판
+# CloverFit5x3.py — CloverFit 규칙 반영 + 탈락 시 코인 0 초기화 + 조건부 60초 유예
 import os, random, asyncio
 from datetime import datetime
 import pytz
@@ -52,11 +52,6 @@ PAT_MULT = {
     "EYE": 8.0,    # 눈
     "JACKPOT": 10.0, # 잭팟(별도 가산)
 }
-
-# 우선순위(높을수록 먼저 판정하고 하위 억제)
-PAT_PRIORITY = ["EYE", "GROUND", "SKY", "ZIG", "RZIG", "H5", "H4", "D3", "V3", "H3"]
-# Zig/재그가 터지면 대각 미발동, Ground/Sky가 터지면 Zig/재그 및 가로 상위 일부 억제 등
-# 구현 단순화를 위해 "상위가 같은 심볼에서 덮은 셀"에 대해 하위 패턴 억제 + 특수 규칙 반영.
 
 # 애니메이션 표시
 SPIN_PLACEHOLDER = "🔄"
@@ -219,36 +214,30 @@ class CloverFit5x3(commands.Cog):
         counted_cells_by_symbol = {s["ch"]: set() for s in SYMBOLS_CF}  # 상위 패턴이 덮은 셀(하위 억제용)
         triggered = {s["ch"]: set() for s in SYMBOLS_CF}  # 심볼별 발동 패턴
 
-        # 잭팟 선판정 여부 저장(추가 가산용)
         jackpot_symbols = []
 
-        # 심볼별로 패턴을 고우선순위→저우선순위로 탐색
+        # 심볼별로 패턴을 고우선순위→저우선순위로 탐색 (정형→연속→잭팟)
         for sym in [s["ch"] for s in SYMBOLS_CF if s["ch"] != "6️⃣"]:
             phi = self._phi(sym)
             # 1) 정형 패턴: EYE, GROUND, SKY, ZIG, RZIG
             for pname in ["EYE","GROUND","SKY","ZIG","RZIG"]:
                 coords = self._pattern_coords(pname)
                 if coords and self._cells_equal(grid, coords, sym):
-                    # 억제: 해당 심볼의 덮은 셀 기록 → 하위 패턴 억제
-                    counted_cells_by_symbol[sym].update(coords)
+                    counted_cells_by_symbol[sym].update(coords)  # 하위 억제
                     gain = int(phi * PAT_MULT[pname] * BET_UNIT)
                     total += gain
                     triggered[sym].add(pname)
                     logs.append(f"{pname} {sym} +{gain:,}")
 
             # 2) 행/열/대각 런(연속형): H5/H4/H3, V3, D3
-            # 지그/재그가 이미 터졌으면 대각(D3) 억제
             forbid_diag = ("ZIG" in triggered[sym]) or ("RZIG" in triggered[sym])
 
             # H5/H4/H3
             H5, H4, H3 = self._find_runs_row(grid, sym)
-            # 상위부터 집계(덮은 셀은 하위 억제)
             for coords_list, tag in [(H5,"H5"), (H4,"H4"), (H3,"H3")]:
                 for coords in coords_list:
-                    # 이미 상위 패턴이 같은 심볼로 덮은 셀을 포함하면(내포) 하위 미발동
                     if any(cell in counted_cells_by_symbol[sym] for cell in coords):
                         continue
-                    # H5가 있으면 H4/H3는 그 구간 내에서는 미발동(내포) → 셀 덮기
                     counted_cells_by_symbol[sym].update(coords)
                     mult = PAT_MULT[tag]
                     gain = int(phi * mult * BET_UNIT)
@@ -292,7 +281,26 @@ class CloverFit5x3(commands.Cog):
             logs = ["• 당첨 없음"]
         return total, logs, None
 
-    # ── Grace timer ─────────────────────────────────────────────────────────
+    # ── 탈락/유예 ───────────────────────────────────────────────────────────
+    async def _eliminate(self, uid: str, run_id: str, channel: discord.abc.Messageable, reason: str = ""):
+        """탈락 처리: 런 종료 + 보유 코인 0원화 + 알림"""
+        # 유예 타이머 중이면 취소
+        self._cancel_grace(uid)
+
+        # 런 종료
+        self.runs.update_one(
+            {"_id": run_id},
+            {"$set": {"status": "dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}}
+        )
+        # 보유 코인 0원
+        self.users.update_one({"_id": uid}, {"$set": {"coins": 0}})
+
+        msg = "💀 탈락했습니다."
+        if reason:
+            msg += f" ({reason})"
+        msg += "\n보유 코인이 **0원**으로 초기화되었어요. `#클로버시작`으로 새롭게 도전하세요."
+        await channel.send(msg)
+
     def _cancel_grace(self, uid:str):
         t = self.grace_tasks.pop(uid, None)
         if t and not t.done():
@@ -304,16 +312,14 @@ class CloverFit5x3(commands.Cog):
             try:
                 await channel.send(
                     "🕒 스핀을 모두 사용했습니다. **60초 안에** `#클로버입금 [금액|all]`으로 ATM 목표를 채우면 다음 라운드로 넘어갈 수 있어요.\n"
-                    "⏳ 60초 후에도 목표 미달이면 자동 탈락합니다."
+                    "⏳ 60초 후에도 목표 미달이면 **즉시 탈락**하며 보유 코인은 0원이 됩니다."
                 )
                 await asyncio.sleep(60)
                 r = self._current_run(uid)
                 if not r or r.get("_id") != run_id or r.get("status") != "playing":
                     return
-                if r.get("bank",0) >= r.get("quota",0):
-                    return
-                self.runs.update_one({"_id": run_id}, {"$set": {"status":"dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}})
-                await channel.send("⏰ 시간이 초과되었습니다. 목표 미달성으로 **탈락**했습니다. `#클로버시작`으로 재도전하세요.")
+                if r.get("bank",0) < r.get("quota",0):
+                    await self._eliminate(uid, run_id, channel, "유예 시간 종료")
             except asyncio.CancelledError:
                 pass
             finally:
@@ -428,13 +434,22 @@ class CloverFit5x3(commands.Cog):
         )
         await msg.edit(content=final_content)
 
-        # 스핀 소진 → 유예
+        # 마지막 스핀 처리: 조건부 유예/즉시 탈락
         run = self._current_run(uid)
         if run and run["spins_left"] == 0:
-            if run["bank"] < run["quota"]:
-                self._start_grace_timer(uid, ctx.channel, run["_id"])
-            else:
+            bank  = run.get("bank", 0)
+            quota = run.get("quota", 0)
+            coins = self._ensure_user(uid).get("coins", 0)
+
+            if bank >= quota:
                 await ctx.send("🎯 목표 달성 상태입니다. `#클로버입금`으로 정산하면 다음 라운드가 시작됩니다.")
+            else:
+                if bank + coins >= quota:
+                    # 해결 가능 → 60초 유예 부여
+                    self._start_grace_timer(uid, ctx.channel, run["_id"])
+                else:
+                    # 해결 불가 → 즉시 탈락(+코인 0원)
+                    await self._eliminate(uid, run["_id"], ctx.channel, "스핀 소진 + 목표 미달(보유 코인 부족)")
 
     @commands.command(name="클로버입금")
     async def deposit(self, ctx, amount:str=None):
@@ -469,6 +484,7 @@ class CloverFit5x3(commands.Cog):
         msg_lines = [f"🏦 입금 완료: {pay:,} (ATM {new_bank:,}/{run['quota']:,})"]
 
         if new_bank >= run["quota"]:
+            # 목표 달성 → 다음 라운드, 유예 취소
             self._cancel_grace(uid)
             next_round = run["round"] + 1
             next_quota = ROUND_BASE_QUOTA + (next_round-1) * ROUND_QUOTA_STEP
@@ -478,9 +494,18 @@ class CloverFit5x3(commands.Cog):
             }})
             msg_lines.append(f"🎯 목표 달성! → 라운드 {next_round} 시작 (새 목표 {next_quota:,}, 스핀 {SPINS_PER_ROUND}회 갱신)")
         else:
+            # 아직 미달
             fresh = self._current_run(uid)
-            if fresh and fresh["spins_left"] == 0 and uid not in self.grace_tasks:
-                self._start_grace_timer(uid, ctx.channel, fresh["_id"])
+            if fresh and fresh["spins_left"] == 0:
+                remain = fresh["quota"] - fresh["bank"]
+                cur_coins = self._ensure_user(uid).get("coins", 0)
+                if remain <= cur_coins:
+                    # 해결 가능 → 유예 유지/부여
+                    if uid not in self.grace_tasks:
+                        self._start_grace_timer(uid, ctx.channel, fresh["_id"])
+                else:
+                    # 해결 불가 → 즉시 탈락
+                    await self._eliminate(uid, fresh["_id"], ctx.channel, "유예 중에도 목표 달성 불가(보유 코인 부족)")
 
         await ctx.send("\n".join(msg_lines))
 
@@ -491,9 +516,8 @@ class CloverFit5x3(commands.Cog):
         if not run:
             await ctx.send("진행중인 런이 없습니다.")
             return
-        self._cancel_grace(uid)
-        self.runs.update_one({"_id": run["_id"]}, {"$set": {"status":"dead", "ended_at": kr_now().strftime('%Y-%m-%d %H:%M:%S')}})
-        await ctx.send(f"🛑 런을 종료했습니다. (라운드 {run['round']}, ATM {run['bank']:,})")
+        # 자발적 종료도 완전 탈락 처리(코인 0)
+        await self._eliminate(uid, run["_id"], ctx.channel, "자발적 종료")
 
     @commands.command(name="클로버랭킹")
     async def rank(self, ctx):
